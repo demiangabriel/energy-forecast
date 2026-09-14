@@ -12,3 +12,4 @@ httpx
 python-dateutil
 tzdata
 pytest
+google-cloud-firestore

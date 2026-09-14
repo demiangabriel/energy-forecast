@@ -9,3 +9,4 @@ data/modele/
 .env
 *.egg-info/
 .pytest_cache/
+*.json 
