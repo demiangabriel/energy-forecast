@@ -12,7 +12,20 @@
 # DOUĂ ori pe zi (acoperind ambele offset-uri posibile ale României); scriptul
 # scripts/verifica_ora_si_ruleaza.py verifică explicit ora locală și rulează
 # efectiv calculul o singură dată, la ora corectă — fără intervenție manuală.
+- name: Creare fisier credentiale Google Cloud
+        run: echo "${{ secrets.GCP_SA_KEY }}" > gcp_key.json
 
+      - name: Rulează prognoza (dacă e ora corectă a României)
+        env:
+          STORAGE_BACKEND: ${{ vars.STORAGE_BACKEND || 'firestore' }}
+          FIRESTORE_PROJECT_ID: ${{ secrets.FIRESTORE_PROJECT_ID }}
+          GOOGLE_APPLICATION_CREDENTIALS: gcp_key.json
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_FROM_NAME: ${{ vars.SMTP_FROM_NAME }}
+        run: python scripts/verifica_ora_si_ruleaza.py
 name: Rulare zilnică prognoză
 
 on:
