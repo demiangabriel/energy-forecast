@@ -1,0 +1,287 @@
+/* Stil "tablou de bord" (R-301, R-1301): curat, modern, carduri, culori de
+   stare, tipografie consecventă. Fără framework CSS extern — reguli simple,
+   ușor de citit și modificat direct (R-307). */
+
+:root {
+  --verde: #1f6f50;
+  --verde-deschis: #e6f4ee;
+  --rosu: #b3261e;
+  --rosu-deschis: #fbe9e7;
+  --ocru: #a86400;
+  --ocru-deschis: #fdf1de;
+  --gri: #5f6b6d;
+  --gri-deschis: #eef1f1;
+  --albastru: #1a5fb4;
+  --albastru-deschis: #e8f0fb;
+  --text: #1c2222;
+  --text-secundar: #5b6666;
+  --fundal: #f6f8f7;
+  --card: #ffffff;
+  --bordura: #dfe6e4;
+  --umbra: 0 1px 3px rgba(20, 30, 28, 0.08), 0 1px 2px rgba(20, 30, 28, 0.06);
+}
+
+/* ---------------------------------------------------------------- tipografie
+   Regulile urmează recomandările Datawrapper pentru vizualizarea datelor
+   (datawrapper.de/blog/fonts-for-data-visualization):
+
+   * sans-serif de lățime NORMALĂ — fonturile condensate sau foarte late se
+     citesc mai greu; Source Sans 3 (succesorul lui Source Sans Pro, unul
+     dintre fonturile recomandate acolo) e implicitul, cu Roboto și stiva de
+     sistem ca rezerve. Rezerva contează: aplicația rulează local și poate fi
+     offline, caz în care fontul de la Google nu se încarcă, iar pagina
+     trebuie să arate în continuare bine;
+   * cifre LINING și TABULARE peste tot unde apar numere — altfel coloanele de
+     valori nu se aliniază pe verticală și se citesc mult mai greu;
+   * greutate normală în text; bold DOAR la titluri și la câteva cuvinte
+     accentuate. Fără greutăți subțiri, care se citesc prost;
+   * majuscule cât mai puține — text în propoziție, mai lizibil. Acolo unde
+     rămân (etichete foarte scurte), primesc spațiere între litere. */
+@import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+
+* { box-sizing: border-box; }
+
+/* `.camp` și alte containere sunt `display:flex`, ceea ce ar învinge valoarea
+   implicită a atributului `hidden`. Fără regula asta, un câmp ascuns rămâne
+   vizibil — și, mai rău, cu eticheta lipită de input. */
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  font-family: "Source Sans 3", Roboto, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  background: var(--fundal);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.55;
+  font-weight: 400;
+  /* cifrele au aceeași lățime peste tot: coloanele de numere se aliniază */
+  font-variant-numeric: tabular-nums lining-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--verde); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.antet {
+  background: var(--card);
+  border-bottom: 1px solid var(--bordura);
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky; top: 0; z-index: 10;
+}
+.antet .brand { display: flex; align-items: center; gap: 10px; padding: 14px 0; font-weight: 700; font-size: 16px; }
+.antet .brand .punct { width: 10px; height: 10px; border-radius: 50%; background: var(--verde); }
+.nav-zone { display: flex; gap: 4px; background: var(--gri-deschis); border-radius: 10px; padding: 4px; }
+.nav-zone a { padding: 7px 16px; border-radius: 8px; color: var(--text-secundar); font-weight: 600; font-size: 13px; }
+.nav-zone a.activ { background: var(--card); color: var(--text); box-shadow: var(--umbra); }
+.nav-zone a:hover { text-decoration: none; }
+
+.continut { max-width: 1180px; margin: 0 auto; padding: 28px 24px 60px; }
+
+/* Ierarhie prin MĂRIME și culoare, nu prin majuscule: textul în propoziție se
+   citește mai repede. Bold rămâne doar aici, la titluri. */
+h1 { font-size: 23px; font-weight: 700; line-height: 1.25; margin: 0 0 4px; letter-spacing: -.01em; }
+h2 { font-size: 17.5px; font-weight: 600; line-height: 1.3; margin: 30px 0 12px; }
+h3 { font-size: 14.5px; font-weight: 600; line-height: 1.35; margin: 0 0 8px; color: var(--text); }
+.subtitlu { color: var(--text-secundar); margin: 0 0 20px; font-size: 14px; }
+p { margin: 0 0 12px; }
+p:last-child { margin-bottom: 0; }
+
+.grid { display: grid; gap: 16px; }
+.grid-carduri { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.grid-2 { grid-template-columns: 1fr 1fr; }
+.grid-3 { grid-template-columns: repeat(3, 1fr); }
+.grid-4 { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 800px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; } }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--bordura);
+  border-radius: 14px;
+  padding: 18px 20px;
+  box-shadow: var(--umbra);
+}
+.card-parc { display: block; }
+.card-parc:hover { text-decoration: none; border-color: var(--verde); }
+.card-parc .rand-titlu { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.card-parc .nume { font-weight: 700; font-size: 15px; color: var(--text); }
+.card-parc .cod { color: var(--text-secundar); font-size: 12px; }
+
+.pastila {
+  display: inline-block; padding: 3px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; line-height: 1.4; white-space: nowrap;
+}
+.pastila.livrat { background: var(--verde-deschis); color: var(--verde); }
+.pastila.abatere { background: var(--ocru-deschis); color: var(--ocru); }
+.pastila.mod_umbra { background: var(--gri-deschis); color: var(--gri); }
+.pastila.doar_fizic { background: var(--albastru-deschis); color: var(--albastru); }
+.pastila.fara_date { background: var(--rosu-deschis); color: var(--rosu); }
+
+.indicatori { display: flex; gap: 22px; margin-top: 14px; }
+.indicator .val { font-size: 21px; font-weight: 700; }
+.indicator .eticheta { font-size: 12px; color: var(--text-secundar); }
+
+.kpi { text-align: left; }
+.kpi .val { font-size: 26px; font-weight: 700; display: block; line-height: 1.15;
+            letter-spacing: -.015em; font-variant-numeric: tabular-nums lining-nums; }
+.kpi .eticheta { font-size: 12px; color: var(--text-secundar); }
+
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--bordura); }
+th { color: var(--text-secundar); font-weight: 600; font-size: 12.5px; letter-spacing: 0; }
+tr:last-child td { border-bottom: none; }
+/* Rândul de sub cursor, ca ochiul să nu sară între coloane pe tabelele lungi
+   de ore — singurul efect de hover din tabele, deliberat discret. */
+tbody tr:hover td, table tr:hover td { background: rgba(31, 111, 80, .035); }
+tr:hover th { background: none; }
+/* Cifrele se citesc pe coloane doar dacă au toate aceeași lățime. */
+td { font-variant-numeric: tabular-nums; }
+
+/* Înălțimea comună a tuturor controalelor dintr-un rând de acțiuni. Fixată
+   explicit pentru că butoanele (padding + text) și select-urile (metrici proprii
+   ale sistemului de operare) ajung altfel la înălțimi diferite, iar rândul arată
+   „rupt" — exact ce se vedea lângă „Descarcă prognoza (CSV)". */
+:root { --inaltime-control: 38px; }
+
+.buton {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: var(--inaltime-control);
+  background: var(--verde); color: #fff; border: 1px solid transparent; border-radius: 9px;
+  padding: 0 16px; font-size: 13.5px; font-weight: 600; line-height: 1.2; cursor: pointer;
+  white-space: nowrap; transition: background .12s ease, border-color .12s ease;
+}
+.buton:hover { background: #17563e; text-decoration: none; color: #fff; }
+.buton.secundar { background: var(--card); color: var(--text); border-color: var(--bordura); }
+.buton.secundar:hover { background: var(--gri-deschis); color: var(--text); border-color: #c8d2ce; }
+.buton.pericol { background: var(--rosu); }
+.buton:disabled { opacity: .5; cursor: not-allowed; }
+.buton:focus-visible { outline: 2px solid var(--verde); outline-offset: 2px; }
+
+/* Rândul de acțiuni: aceeași înălțime pentru orice tip de control, inclusiv
+   pentru formularele de un singur buton (care altfel s-ar alinia după linia de
+   bază a textului, nu după marginea butonului). */
+.actiuni { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; margin: 16px 0; }
+.actiuni > form { display: flex; align-items: stretch; gap: 0; margin: 0; }
+.actiuni .buton { height: var(--inaltime-control); }
+
+/* Buton + select lipite într-un singur control („Descarcă prognoza" + formatul
+   de timp): se citesc ca o singură acțiune cu o opțiune, nu ca două lucruri
+   nimerite unul lângă altul. */
+.actiuni form.grup-control { gap: 0; }
+.actiuni form.grup-control .buton {
+  border-top-right-radius: 0; border-bottom-right-radius: 0;
+}
+.actiuni form.grup-control select {
+  height: var(--inaltime-control); margin-left: -1px;
+  border-top-left-radius: 0; border-bottom-left-radius: 0;
+  border-left-color: var(--bordura); background: var(--card);
+  font-size: 12.5px; padding: 0 28px 0 10px; color: var(--text-secundar); max-width: 210px;
+}
+.actiuni form.grup-control select:hover { background: var(--gri-deschis); }
+
+/* Filtre de listă (portofoliu: toate / fotovoltaic / eolian). Sunt LINKURI,
+   nu butoane: fiecare filtru are propriul URL, deci se poate pune la favorite
+   și se întoarce corect cu butonul „înapoi" al browserului. */
+.filtre { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 18px; }
+.filtre .filtru {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 14px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  color: var(--text-secundar); background: var(--card);
+  border: 1px solid var(--bordura); text-decoration: none;
+  transition: background .12s ease, color .12s ease, border-color .12s ease;
+}
+.filtre .filtru:hover { background: var(--gri-deschis); color: var(--text); text-decoration: none; }
+.filtre .filtru.activ {
+  background: var(--verde); border-color: var(--verde); color: #fff;
+}
+.filtre .filtru .numar {
+  font-size: 11.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px;
+  background: var(--gri-deschis); color: var(--text-secundar);
+}
+.filtre .filtru.activ .numar { background: rgba(255, 255, 255, .22); color: #fff; }
+
+/* Butonul „înapoi”, deasupra titlului fiecărei pagini. Discret intenționat:
+   e o unealtă de navigare mereu la îndemână, nu o acțiune a paginii. */
+.buton-inapoi {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-bottom: 14px; padding: 5px 12px 5px 9px;
+  font-size: 12.5px; font-weight: 600; color: var(--text-secundar);
+  background: var(--card); border: 1px solid var(--bordura); border-radius: 999px;
+  text-decoration: none; transition: background .12s ease, color .12s ease;
+}
+.buton-inapoi:hover { background: var(--gri-deschis); color: var(--text); text-decoration: none; }
+
+/* Dialog nativ <dialog>: fără bibliotecă, cu închidere pe Esc și focus captiv
+   gratuite din partea browserului. */
+.dialog-pierderi {
+  border: 1px solid var(--bordura); border-radius: 14px; padding: 22px;
+  max-width: 560px; width: calc(100% - 32px); box-shadow: 0 18px 48px rgba(0, 0, 0, .18);
+  color: var(--text); background: var(--card);
+}
+.dialog-pierderi::backdrop { background: rgba(20, 30, 26, .45); }
+.dialog-pierderi table { font-size: 13.5px; }
+.dialog-pierderi td { padding: 5px 4px; border-bottom: none; }
+.dialog-pierderi input[type="number"] { padding: 6px 8px; text-align: right; }
+
+form.form-simplu { display: flex; flex-direction: column; gap: 16px; max-width: 640px; }
+.camp { display: flex; flex-direction: column; gap: 5px; }
+.camp label { font-weight: 600; font-size: 13.5px; }
+.camp .explicatie { font-size: 12px; color: var(--text-secundar); }
+.camp .importanta { font-size: 11px; letter-spacing: .05em; font-weight: 700; text-transform: uppercase; padding: 1px 7px; border-radius: 5px; margin-left: 6px; }
+.importanta.important { background: var(--rosu-deschis); color: var(--rosu); }
+.importanta.optional { background: var(--gri-deschis); color: var(--gri); }
+input, select, textarea {
+  border: 1px solid var(--bordura); border-radius: 8px; padding: 8px 11px; font-size: 14px;
+  font-family: inherit; background: #fff; color: var(--text); line-height: 1.35;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+input:not([type="checkbox"]):not([type="radio"]), select {
+  min-height: var(--inaltime-control);   /* aliniere cu butoanele pe același rând */
+}
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--verde); outline-offset: 1px; border-color: var(--verde);
+}
+fieldset { border: 1px solid var(--bordura); border-radius: 12px; padding: 16px 18px; margin: 0 0 18px; }
+legend { padding: 0 8px; font-weight: 600; font-size: 13.5px; color: var(--text-secundar); }
+label { display: block; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--verde); outline-offset: 0; }
+fieldset { border: 1px solid var(--bordura); border-radius: 12px; padding: 16px 18px; margin: 0; }
+legend { font-weight: 700; font-size: 13.5px; padding: 0 6px; }
+
+.avertisment { background: var(--ocru-deschis); color: var(--ocru); border-radius: 10px; padding: 12px 14px; font-size: 13.5px; margin: 12px 0; }
+.eroare { background: var(--rosu-deschis); color: var(--rosu); border-radius: 10px; padding: 12px 14px; font-size: 13.5px; margin: 12px 0; }
+.succes { background: var(--verde-deschis); color: var(--verde); border-radius: 10px; padding: 12px 14px; font-size: 13.5px; margin: 12px 0; }
+.info { background: var(--albastru-deschis); color: var(--albastru); border-radius: 10px; padding: 12px 14px; font-size: 13.5px; margin: 12px 0; }
+
+.chip-tehnic { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; font-weight: 700; color: var(--gri); background: var(--gri-deschis); padding: 2px 8px; border-radius: 6px; }
+
+.zona-tehnica-banner { background: #22282c; color: #e6ebe9; padding: 8px 24px; font-size: 12.5px; text-align: center; }
+.zona-tehnica-banner strong { color: #fff; }
+
+.pas-ghid { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px dashed var(--bordura); }
+.pas-ghid:last-child { border-bottom: none; }
+.pas-ghid .bifa { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--bordura); flex: none; margin-top: 1px; }
+.pas-ghid.facut .bifa { background: var(--verde); border-color: var(--verde); }
+
+.lista-simpla { list-style: none; padding: 0; margin: 0; }
+.lista-simpla li { padding: 9px 0; border-bottom: 1px solid var(--bordura); font-size: 13.5px; }
+.lista-simpla li:last-child { border-bottom: none; }
+
+.text-mic { font-size: 12.5px; line-height: 1.5; color: var(--text-secundar); }
+
+.rand-blocat { background: var(--rosu-deschis); }
+canvas { max-width: 100%; }
+
+/* Acțiunile unui parc, grupate pe scop (acțiuni / analiză / date și model).
+   Înainte erau paisprezece butoane identice la rând: nimic nu spunea care e
+   acțiunea principală și care e o unealtă de analiză, iar ochiul trebuia să
+   citească fiecare etichetă ca să găsească ce caută. */
+.grup-actiuni { margin: 14px 0; }
+.grup-actiuni .eticheta-grup {
+  display: block; margin-bottom: 7px;
+  font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-secundar);
+}
+.grup-actiuni .actiuni { margin: 0; }

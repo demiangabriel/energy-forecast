@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block titlu %}Calibrare geometrie — {{ parc.nume }}{% endblock %}
+{% block continut %}
+<h1>Calibrarea geometriei</h1>
+<p class="subtitlu">{{ parc.nume }} ({{ parc.cod }}) — testează automat zeci de combinații de înclinare/azimut peste vremea reală istorică și le compară cu producția reală (secțiunea 7).</p>
+
+{% if request.query_params.get('mesaj') %}<div class="info">{{ request.query_params.get('mesaj') }}</div>{% endif %}
+{% if eroare %}<div class="eroare">{{ eroare }}</div>{% endif %}
+
+{% if not rezultat %}
+<div class="card" style="max-width:520px">
+  <form method="post" action="/parcuri/{{ parc.id }}/calibrare/ruleaza">
+    <button class="buton" type="submit">Rulează calibrarea</button>
+  </form>
+  <p class="text-mic" style="margin-top:10px">Necesită istoric de producție reală importat (secțiunea 11) — poate dura până la câteva zeci de secunde.</p>
+</div>
+{% else %}
+<div class="card">
+  <p>{{ rezultat.numar_ore_folosite }} ore folosite pentru comparație.</p>
+  <h3>Combinație optimă</h3>
+  <table>
+    <tr><th>Înclinare</th><th>Azimut</th><th>Eroare medie, DUPĂ scalare (MW)</th><th>Factor de scalare</th></tr>
+    <tr><td>{{ rezultat.optim.inclinare_grade }}°</td><td>{{ rezultat.optim.azimut_grade }}°</td><td>{{ rezultat.optim.eroare_mae_kw | mw }}</td><td>{{ rezultat.optim.factor_scalare }}</td></tr>
+  </table>
+  <p class="text-mic" style="margin-top:8px">Fiecare geometrie testată e evaluată CU pierderile de sistem și
+    degradarea scoase din model, înlocuite de un factor de scalare potrivit separat prin cele mai mici pătrate
+    — altfel o pierdere/degradare configurată greșit ar deplasa la fel de mult TOATE geometriile testate, iar
+    sondajul ar alege geometria după magnitudine, nu după forma reală a producției.</p>
+
+  <div class="{{ 'avertisment' if rezultat.pierderi_si_degradare_cumulate_pct > 15 else 'info' }}" style="margin-top:10px">
+    Factorul de scalare optim e <strong>{{ rezultat.factor_scalare_optim }}</strong> — adică
+    <strong>{{ rezultat.pierderi_si_degradare_cumulate_pct }}%</strong> din producție e „pierdută" undeva
+    ce nu ține de înclinare/azimut (pierderi de sistem + degradare, configurate momentan la valorile din
+    Modul tehnic). Butonul „Aplică pe configurația curentă" scrie DOAR înclinarea și azimutul —
+    factorul de scalare nu se distribuie automat peste pierderi, pentru că el adună la un loc
+    pierderi de sistem și degradare, iar unde se duce fiecare procent e o judecată despre parcul
+    real, nu un calcul. Butonul de mai jos deschide un dialog în care le ajustați dumneavoastră,
+    cu totalul cumulat afișat în timp real, până ajunge la acest factor.
+    {% if rezultat.info_degradare %}
+    <br>Parcul are {{ rezultat.info_degradare.ani }} ani de la punerea în funcțiune; la degradarea
+    configurată ({{ parc.config_pv.degradare_anuala_pct }}%/an), aceasta explică
+    ~{{ rezultat.info_degradare.explicat_de_degradare_pct }}% din pierdere — restul de
+    ~{{ rezultat.info_degradare.rest_pierderi_sistem_pct }}% sunt probabil pierderi de sistem
+    neconfigurate corect (murdărire, indisponibilitate, cablaj etc.), de distribuit manual în
+    Modul tehnic.
+    {% endif %}
+  </div>
+
+  <button class="buton secundar" type="button" style="margin-top:10px"
+          onclick="document.getElementById('dialogPierderi').showModal()">
+    Ajustează pierderile ca să ajungă la acest factor…
+  </button>
+
+  {% if rezultat.se_poate_aplica_automat %}
+  <form method="post" action="/parcuri/{{ parc.id }}/calibrare/aplica" style="margin-top:12px">
+    <input type="hidden" name="inclinare_grade" value="{{ rezultat.optim.inclinare_grade }}">
+    <input type="hidden" name="azimut_grade" value="{{ rezultat.optim.azimut_grade }}">
+    <button class="buton" type="submit">Aplică pe configurația curentă</button>
+  </form>
+  {% else %}
+  <div class="avertisment">Rezultatul e informativ pentru acest parc (est-vest sau tracker) — nu se poate aplica automat (R-703). Editați manual din Modul tehnic dacă doriți.</div>
+  {% endif %}
+
+  {% if rezultat.decalaj_minute_fata_de_soare is not none and
+        (rezultat.decalaj_minute_fata_de_soare > 25 or rezultat.decalaj_minute_fata_de_soare < -25) %}
+  <div class="eroare" style="margin-top:12px">
+    <strong>Atenție — rezultatul de mai sus e probabil nefolosibil.</strong>
+    Producția măsurată e centrată cu <strong>{{ rezultat.decalaj_minute_fata_de_soare | abs | round | int }}
+    minute</strong> {{ 'mai târziu' if rezultat.decalaj_minute_fata_de_soare > 0 else 'mai devreme' }}
+    decât amiaza solară a locului. Calibrarea deduce geometria din FORMA curbei zilnice, așa că
+    un decalaj în timp o face să compenseze rotind azimutul — potrivește datele, dar nu descrie parcul.
+    <br>Corectați întâi alinierea: verificați fusul de import al parcului și dacă istoricul conține
+    ore importate cu setări diferite (Modul tehnic → curățare producție pe interval, apoi reimport).
+  </div>
+  {% elif rezultat.decalaj_minute_fata_de_soare is not none %}
+  <p class="text-mic" style="margin-top:10px">Aliniere verificată: producția măsurată e centrată la
+    {{ rezultat.decalaj_minute_fata_de_soare | abs | round | int }} minute de amiaza solară — în
+    regulă, geometria de mai sus se poate lua în serios.</p>
+  {% endif %}
+
+  <h3 style="margin-top:20px">Alternative apropiate</h3>
+  <table>
+    <tr><th>Înclinare</th><th>Azimut</th><th>Eroare medie (MW)</th><th>Factor de scalare</th></tr>
+    {% for r in rezultat.alternative %}
+    <tr><td>{{ r.inclinare_grade }}°</td><td>{{ r.azimut_grade }}°</td><td>{{ r.eroare_mae_kw | mw }}</td><td>{{ r.factor_scalare }}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+{# ------------------------------------------------------------------ dialog pierderi #}
+<dialog id="dialogPierderi" class="dialog-pierderi">
+  <form method="post" action="/parcuri/{{ parc.id }}/calibrare/pierderi" id="formPierderi">
+    <h3 style="margin-top:0">Ajustarea pierderilor</h3>
+    <p class="text-mic">Calibrarea a găsit că <strong>{{ rezultat.pierderi_si_degradare_cumulate_pct }}%</strong>
+      din producție se pierde undeva ce nu ține de înclinare/azimut. Platforma NU împarte singură acest
+      procent pe câmpurile de mai jos — unde se duce e o judecată despre parcul real (e murdărire?
+      indisponibilitate? plăcuță supraevaluată?), nu un calcul. Ajustați până când totalul de jos ajunge
+      la țintă; nimic nu se dublează, pentru că totalul arată mereu suma reală.</p>
+
+    <table style="margin:10px 0">
+      {% for camp, eticheta in [
+          ('pierdere_murdarire_pct', 'Murdărire'),
+          ('pierdere_neuniformitate_pct', 'Neuniformitate (mismatch)'),
+          ('pierdere_cablaj_conexiuni_pct', 'Cablaj și conexiuni'),
+          ('pierdere_lid_pct', 'LID (degradare inițială)'),
+          ('pierdere_placuta_pct', 'Toleranța plăcuței'),
+          ('pierdere_indisponibilitate_pct', 'Indisponibilitate'),
+          ('pierdere_nemodelata_pct', 'Rest neatribuit')] %}
+      <tr>
+        <td style="width:60%">{{ eticheta }}</td>
+        <td><input class="intrare-pierdere" type="number" step="0.1" min="0" max="100"
+                   name="{{ camp }}" value="{{ parc.config_pv[camp] }}" style="width:90px"> %</td>
+      </tr>
+      {% endfor %}
+      <tr>
+        <td>Degradare anuală
+          <span class="text-mic">({{ ani_functionare }} ani de la punerea în funcțiune)</span></td>
+        <td><input class="intrare-pierdere" type="number" step="0.05" min="0" max="10" id="degradareAnuala"
+                   name="degradare_anuala_pct" value="{{ parc.config_pv.degradare_anuala_pct }}"
+                   style="width:90px"> %/an</td>
+      </tr>
+    </table>
+
+    <div class="card" style="background:var(--gri-deschis);padding:12px">
+      <div style="display:flex;justify-content:space-between"><span>Total cumulat (multiplicativ)</span>
+        <strong id="totalPierderi">—</strong></div>
+      <div style="display:flex;justify-content:space-between"><span>Factor rezultat</span>
+        <strong id="factorRezultat">—</strong></div>
+      <div style="display:flex;justify-content:space-between;margin-top:6px;padding-top:6px;border-top:1px solid var(--bordura)">
+        <span>Factor țintă (din calibrare)</span>
+        <strong>{{ rezultat.factor_scalare_optim }}</strong></div>
+      <div style="display:flex;justify-content:space-between"><span>Diferență</span>
+        <strong id="diferentaFactor">—</strong></div>
+    </div>
+
+    <p class="text-mic" style="margin:10px 0 0">Pierderile se compun <strong>multiplicativ</strong>, nu
+      aditiv: 5% și 5% înseamnă 9,75% pierdere totală, nu 10%. De-asta totalul de mai sus nu e suma
+      cifrelor introduse.</p>
+
+    <div class="actiuni" style="margin-top:14px">
+      <button class="buton" type="submit">Salvează pierderile</button>
+      <button class="buton secundar" type="button"
+              onclick="document.getElementById('dialogPierderi').close()">Renunță</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+
+<p><a href="/parcuri/{{ parc.id }}">&larr; Înapoi la parc</a></p>
+{% endblock %}
+
+{% block script %}
+{% if rezultat %}
+<script>
+// Totalul se recalculează la fiecare tastă: fără el, operatorul ar ajusta pe
+// ghicite și ar descoperi abia după salvare că a depășit ținta. Aceeași formulă
+// multiplicativă ca în app/core/pv_model.py — pierderile NU se adună.
+(function () {
+  const tinta = {{ rezultat.factor_scalare_optim }};
+  const aniFunctionare = {{ ani_functionare }};
+  const intrari = document.querySelectorAll('.intrare-pierdere');
+
+  function recalculeaza() {
+    let factor = 1.0;
+    document.querySelectorAll('input[name^="pierdere_"]').forEach(i => {
+      const v = parseFloat(i.value);
+      if (!isNaN(v)) factor *= (1 - v / 100);
+    });
+    const rataDegradare = parseFloat(document.getElementById('degradareAnuala').value);
+    if (!isNaN(rataDegradare) && aniFunctionare > 0) {
+      factor *= Math.max(0, 1 - (rataDegradare / 100) * aniFunctionare);
+    }
+
+    const pierdutPct = (1 - factor) * 100;
+    document.getElementById('totalPierderi').textContent = pierdutPct.toFixed(1) + '%';
+    document.getElementById('factorRezultat').textContent = factor.toFixed(3);
+
+    const diferenta = factor - tinta;
+    const el = document.getElementById('diferentaFactor');
+    el.textContent = (diferenta >= 0 ? '+' : '') + diferenta.toFixed(3) +
+      (Math.abs(diferenta) < 0.005 ? '  ✓ potrivit'
+        : diferenta > 0 ? '  (mai aveți de adăugat pierderi)'
+                        : '  (ați pus prea multe pierderi)');
+    el.style.color = Math.abs(diferenta) < 0.005 ? 'var(--verde)'
+                   : Math.abs(diferenta) < 0.03 ? 'var(--text)' : 'var(--rosu)';
+  }
+
+  intrari.forEach(i => i.addEventListener('input', recalculeaza));
+  recalculeaza();
+})();
+</script>
+{% endif %}
+{% endblock %}

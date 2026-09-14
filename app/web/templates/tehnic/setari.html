@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block titlu %}Setări de operare{% endblock %}
+{% block continut %}
+<h1>Setări de operare</h1>
+<p class="subtitlu">Orice prag, procent sau oră pe care operatorul ar putea dori s-o schimbe în operare curentă — editabile de aici, NICIODATĂ valori fixe în cod (R-1401).</p>
+{% if request.query_params.get('salvat') %}<div class="succes">Setări salvate.</div>{% endif %}
+{% if erori %}
+<div class="eroare"><strong>Nu s-au salvat toate setările:</strong>
+  <ul style="margin:6px 0 0 18px;padding:0">
+    {% for e in erori %}<li>{{ e }}</li>{% endfor %}
+  </ul>
+  <div class="text-mic" style="margin-top:6px">Setările valide au fost salvate; corectați-le pe cele de mai sus.</div>
+</div>
+{% endif %}
+
+<form class="form-simplu" method="post" action="/tehnic/setari" style="max-width:640px">
+  {% for cheie, s in setari.items() %}
+  <div class="camp">
+    <label>{{ s.eticheta }}</label>
+    <div class="explicatie">{{ s.explicatie }}</div>
+    <input name="{{ cheie }}" value="{{ s.valoare }}" {{ 'type="password" autocomplete="new-password"' | safe if s.get('secret') else '' }}>
+  </div>
+  {% endfor %}
+  <button class="buton" type="submit">Salvează setările</button>
+</form>
+<p><a href="/tehnic">&larr; Modul tehnic</a></p>
+{% endblock %}

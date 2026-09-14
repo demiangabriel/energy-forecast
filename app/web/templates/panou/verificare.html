@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block titlu %}Verificare — {{ parc.nume }}{% endblock %}
+{% block continut %}
+<h1>Verificarea prognozei</h1>
+<p class="subtitlu">{{ parc.nume }} ({{ parc.cod }}) — cât de bună e prognoza, măsurat corect:
+  doar pe orele în care parcul chiar putea produce, fără orele cu avarii sau limitări, și comparat
+  cu o prognoză de referință. Un model care nu bate referința nu aduce nimic.</p>
+
+<div class="actiuni">
+  {% for z in [30, 90, 180, 365] %}
+  <a class="buton {{ '' if z == zile else 'secundar' }}" href="/parcuri/{{ parc.id }}/verificare?zile={{ z }}">Ultimele {{ z }} zile</a>
+  {% endfor %}
+  <a class="buton secundar" href="/parcuri/{{ parc.id }}">&larr; Înapoi la parc</a>
+</div>
+
+{% if not rezultat.disponibil %}
+<div class="card">
+  <p>Nu există încă suficiente perechi prognoză/realizat în ultimele {{ zile }} zile.</p>
+  <p class="text-mic">Verificarea are nevoie de două lucruri simultan: prognoze salvate (rulări) și
+    producție reală importată pentru aceleași ore. Importați istoricul din pagina parcului, apoi
+    reveniți aici.</p>
+</div>
+{% else %}
+{% set r = rezultat.raport %}
+{% set ind = r.indicatori %}
+
+<h2>Indicatori principali</h2>
+<div class="grid grid-4">
+  <div class="card kpi">
+    <span class="val">{{ '%.2f'|format(ind.nmae_capacitate_pct) if ind.nmae_capacitate_pct is not none else '—' }}%</span>
+    <span class="eticheta">nMAE (eroare medie absolută)</span>
+  </div>
+  <div class="card kpi">
+    <span class="val">{{ '%.2f'|format(ind.nrmse_capacitate_pct) if ind.nrmse_capacitate_pct is not none else '—' }}%</span>
+    <span class="eticheta">nRMSE (penalizează erorile mari)</span>
+  </div>
+  <div class="card kpi">
+    <span class="val">{{ '%+.2f'|format(ind.nbias_capacitate_pct) if ind.nbias_capacitate_pct is not none else '—' }}%</span>
+    <span class="eticheta">bias (abatere sistematică)</span>
+  </div>
+  <div class="card kpi">
+    <span class="val">{{ '%+.3f'|format(r.skill_vs_referinta) if r.skill_vs_referinta is not none else '—' }}</span>
+    <span class="eticheta">scor de skill vs. referință</span>
+  </div>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <p class="text-mic" style="margin:0">
+    Toți indicatorii procentuali de mai sus sunt raportați la
+    <strong>{{ rezultat.baza_normalizare_kw | mw }} MW</strong> (puterea de referință a parcului) —
+    convenția folosită de operatorii de sistem. Aceiași indicatori raportați la producția medie
+    (convenția folosită de traderi) dau un nMAE de
+    <strong>{{ '%.2f'|format(ind.nmae_medie_pct) if ind.nmae_medie_pct is not none else '—' }}%</strong>.
+    Orice cifră de acuratețe fără baza de normalizare declarată e neinterpretabilă.
+  </p>
+</div>
+
+<h2>Cum se citește scorul de skill</h2>
+<div class="card">
+  <p style="margin-top:0">Scorul de skill compară prognoza cu o <strong>prognoză de referință</strong> —
+    combinația optimă dintre persistență și climatologie{% if parc.tehnologie.value == 'fotovoltaic' %},
+    calculată în spațiul indicelui de senin (adică „mâine cerul va fi la fel de senin ca azi”, nu
+    „mâine la ora 13 va fi cât a fost azi la ora 13”){% endif %}.</p>
+  <ul class="lista-simpla">
+    <li><strong>Peste 0</strong> — modelul e mai bun decât o regulă simplă. Asta e minimul care justifică existența lui.</li>
+    <li><strong>0</strong> — exact cât referința: modelul nu aduce nimic.</li>
+    <li><strong>Sub 0</strong> — modelul e mai rău decât a nu avea model. Semn că ceva e greșit în configurație sau în date.</li>
+  </ul>
+  <p class="text-mic">Referința însăși are un nMAE de
+    {{ '%.2f'|format(r.indicatori_referinta.nmae_capacitate_pct) if r.indicatori_referinta.nmae_capacitate_pct is not none else '—' }}%
+    pe aceleași ore.</p>
+</div>
+
+<h2>Ce ore au intrat în calcul</h2>
+<div class="card">
+  <table>
+    <tr><th>Categorie</th><th>Ore</th><th>De ce</th></tr>
+    <tr>
+      <td><strong>Incluse</strong></td><td>{{ ind.numar_ore }}</td>
+      <td class="text-mic">Ore utile, cu prognoză și realizat, fără probleme de calitate.</td>
+    </tr>
+    <tr>
+      <td>Excluse — noapte</td><td>{{ r.ore_excluse_noapte }}</td>
+      <td class="text-mic">La fotovoltaic, includerea nopților face indicatorul artificial de bun:
+        zerourile se „prognozează” perfect și diluează erorile reale de peste zi.</td>
+    </tr>
+    <tr>
+      <td>Excluse — calitate</td><td>{{ r.ore_excluse_qc }}</td>
+      <td class="text-mic">Avarii, limitări de putere, valori blocate. Măsoară starea parcului, nu
+        calitatea prognozei. <a href="/parcuri/{{ parc.id }}/calitate">Vezi detaliile</a>.</td>
+    </tr>
+  </table>
+</div>
+
+{% if r.pe_orizont %}
+<h2>Acuratețe pe orizont de prognoză</h2>
+<div class="card">
+  <p class="text-mic" style="margin-top:0">O valoare emisă cu 2 ore înainte nu e comparabilă cu una
+    emisă cu 36 de ore înainte. Separarea pe orizont arată acuratețea reală la termenul care contează
+    pentru piață (ziua următoare).</p>
+  <table>
+    <tr><th>Orizont</th><th>Ore</th><th>nMAE (%)</th><th>nRMSE (%)</th><th>Bias (%)</th></tr>
+    {% for eticheta, i in r.pe_orizont.items() %}
+    <tr>
+      <td><strong>{{ eticheta }}</strong></td>
+      <td>{{ i.numar_ore }}</td>
+      <td>{{ '%.2f'|format(i.nmae_capacitate_pct) if i.nmae_capacitate_pct is not none else '—' }}</td>
+      <td>{{ '%.2f'|format(i.nrmse_capacitate_pct) if i.nrmse_capacitate_pct is not none else '—' }}</td>
+      <td>{{ '%+.2f'|format(i.nbias_capacitate_pct) if i.nbias_capacitate_pct is not none else '—' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+{% if r.crps_kw is not none %}
+<h2>Verificarea benzilor de incertitudine</h2>
+<div class="card">
+  <p class="text-mic" style="margin-top:0">Un interval P10-P90 e util doar dacă realizarea cade în
+    el aproximativ în 80% din cazuri. „Acoperirea observată” de mai jos trebuie să fie apropiată de
+    nivelul promis; altfel intervalul e decorativ.</p>
+  <table>
+    <tr><th>Nivel promis</th><th>Acoperire observată</th></tr>
+    {% for nivel, acoperire in r.acoperire.items() %}
+    <tr><td>{{ '%.0f'|format(nivel * 100) }}%</td><td>{{ '%.1f'|format(acoperire * 100) }}%</td></tr>
+    {% endfor %}
+  </table>
+  <p class="text-mic">CRPS: {{ r.crps_kw | mw }} MW (scorul propriu al prognozei
+    probabilistice — mai mic e mai bun).
+    Lățimea medie a intervalului P10-P90:
+    {{ r.latime_interval_kw | mw if r.latime_interval_kw is not none else '—' }} MW.</p>
+</div>
+{% endif %}
+
+<h2>Repere din industrie</h2>
+<div class="card">
+  <p class="text-mic" style="margin-top:0">Pentru context, valorile raportate în literatură și de
+    furnizorii comerciali pentru prognoza pe ziua următoare, normalizate la puterea instalată:
+    <strong>fotovoltaic, un singur parc: nMAE ~6-9%</strong>;
+    <strong>eolian, un singur parc: nRMSE ~10-20%</strong> (mai mult în teren complex).
+    Portofoliile agregate ies mai bine decât media parcurilor individuale, pentru că erorile se
+    compensează parțial între locații.</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block titlu %}Prognoză — următoarea lună — {{ parc.nume }}{% endblock %}
+{% block continut %}
+<h1>Estimare lunară de producție</h1>
+<p class="subtitlu">{{ parc.nume }} ({{ parc.cod }}) — {{ eticheta_perioada }}
+  ({{ date.prima_zi }} … {{ date.ultima_zi }}), oră locală {{ parc.fus_orar }}.</p>
+
+<div class="card" style="margin-bottom:16px">
+  <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-end">
+    <form method="get" action="/parcuri/{{ parc.id }}/prognoza-luna"
+          style="display:flex;gap:8px;align-items:flex-end">
+      <input type="hidden" name="mod" value="luna">
+      <div class="camp" style="gap:4px">
+        <label style="font-size:12.5px">Lună calendaristică</label>
+        <select name="luni_combinat" onchange="
+            const [a, l] = this.value.split('-');
+            this.form.an.value = a; this.form.luna.value = l; this.form.submit();">
+          {% for m in luni_disponibile %}
+          <option value="{{ m.an }}-{{ m.luna }}"
+                  {{ 'selected' if mod == 'luna' and m.an == an and m.luna == luna else '' }}>{{ m.eticheta }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <input type="hidden" name="an" value="{{ an or '' }}">
+      <input type="hidden" name="luna" value="{{ luna or '' }}">
+      <button class="buton {{ 'secundar' if mod != 'luna' else '' }}" type="submit">Arată luna</button>
+    </form>
+
+    <form method="get" action="/parcuri/{{ parc.id }}/prognoza-luna"
+          style="display:flex;gap:8px;align-items:flex-end">
+      <input type="hidden" name="mod" value="zile">
+      <div class="camp" style="gap:4px">
+        <label style="font-size:12.5px">Sau: următoarele N zile, de mâine</label>
+        <input name="zile" value="{{ zile }}" inputmode="numeric" style="width:90px">
+      </div>
+      <button class="buton {{ 'secundar' if mod != 'zile' else '' }}" type="submit">Arată zilele</button>
+    </form>
+  </div>
+  <p class="text-mic" style="margin:10px 0 0">Luna calendaristică e forma potrivită pentru planificare
+    și pentru raportul către client; modul „următoarele N zile” răspunde la altă întrebare — ce urmează,
+    indiferent unde cade granița lunii.</p>
+</div>
+
+<div class="avertisment">
+  <strong>Două surse diferite, etichetate distinct pe fiecare rând — nu le amestecați vizual:</strong>
+  <ul style="margin:6px 0 0 18px;padding:0">
+    <li><strong>Prognoză NWP</strong> — modelele meteo numerice (ECMWF/GFS/ICON) nu sunt fiabile dincolo de
+      ~16 zile (R-906); zilele din acest interval acoperite de cea mai recentă rulare reușită arată
+      prognoza REALĂ, calculată complet (fizică + corecție ML dacă parcul are model antrenat).</li>
+    <li><strong>Climatologie</strong> — dincolo de acel orizont, NU există o prognoză meteorologică
+      propriu-zisă. Valoarea afișată e media producției calculate din vremea REALĂ (reanaliză ERA5) din
+      aceleași zile calendaristice ale anilor anteriori (până la 3, câți sunt disponibili) — un tipar
+      istoric, nu o predicție a vremii viitoare. Incertitudinea e mult mai mare; de-asta fiecare zi arată
+      și un interval minim-maxim ("Ani folosiți" arată pe câți ani s-a bazat media acelei zile), nu doar o
+      singură cifră. Detalii în <a href="/tehnic/documentatie">Documentație, secțiunea „Limitări
+      cunoscute"</a>.</li>
+  </ul>
+</div>
+
+{% if mesaj %}<div class="succes">{{ mesaj }}</div>{% endif %}
+{% if eroare %}<div class="eroare">{{ eroare }}</div>{% endif %}
+
+{% if not date.are_rulare %}
+<div class="avertisment" style="margin-top:8px">Nu există încă nicio rulare de prognoză pentru acest parc —
+  toate zilele de mai jos sunt estimări climatologice. <a href="/parcuri/{{ parc.id }}">Rulați o prognoză</a>
+  pentru zilele apropiate din orizontul util.</div>
+{% elif date.zile_nwp < orizont_maxim %}
+<div class="avertisment" style="margin-top:8px">
+  <strong>Momentan doar {{ date.zile_nwp }} zile au prognoză NWP, deși modelele meteo acoperă până la
+  {{ orizont_maxim }}.</strong> Rularea zilnică calculează doar orizontul implicit (mai scurt și mult mai
+  ieftin ca trafic, suficient pentru raportul zilnic). Restul orizontului se cere explicit, când chiar
+  aveți nevoie de el — zilele rămase devin prognoză meteo reală în loc de climatologie.
+  <form method="post" action="/parcuri/{{ parc.id }}/prognoza-luna/extinde" style="margin-top:8px">
+    <button class="buton" type="submit">Calculează NWP pe {{ orizont_maxim }} zile</button>
+  </form>
+</div>
+{% endif %}
+
+<div class="grid grid-4" style="margin:16px 0">
+  <div class="card kpi" style="border-color:var(--verde)">
+    <span class="val">{{ date.total_estimat_kwh | mw }}</span>
+    <span class="eticheta">MWh — total {{ eticheta_perioada }}</span>
+  </div>
+  <div class="card kpi"><span class="val">{{ date.total_real_kwh | mw }}</span><span class="eticheta">MWh realizați ({{ date.zile_reale }} zile încheiate)</span></div>
+  <div class="card kpi"><span class="val">{{ date.total_nwp_kwh | mw }}</span><span class="eticheta">MWh — prognoză NWP ({{ date.zile_nwp }} zile)</span></div>
+  <div class="card kpi"><span class="val">{{ date.total_climatologie_kwh | mw }}</span><span class="eticheta">MWh — climatologie (toate cele {{ date.randuri | length }} zile)</span></div>
+</div>
+<p class="text-mic" style="margin:-6px 0 16px">Totalul din primul indicator ia, pentru fiecare zi,
+  cifra cu cea mai mare încredere disponibilă: <strong>ce s-a măsurat</strong> pentru zilele încheiate,
+  <strong>prognoza NWP</strong> pentru zilele din orizontul meteo, <strong>climatologia</strong> pentru
+  restul. Celelalte trei arată fiecare sursă separat și NU se adună între ele.</p>
+
+<div class="card">
+  <canvas id="graficLuna" height="90"></canvas>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <p class="text-mic" style="margin-top:0">Cele două surse apar separat, pe fiecare zi — inclusiv pentru zilele
+    acoperite de NWP, ca să se poată compara direct cele două estimări.</p>
+  <table>
+    <tr><th>Ziua</th><th>Realizat (MWh)</th><th>Prognoză NWP (MW)</th><th>Climatologie (MW)</th><th>Interval climatologic (MW)</th><th>Ani folosiți</th></tr>
+    {% for r in date.randuri %}
+    <tr>
+      <td>{{ r.data }}
+        {% if r.sursa_estimata == 'realizat' %}<span class="pastila livrat">realizat</span>
+        {% elif r.sursa_estimata == 'nwp' %}<span class="pastila doar_fizic">NWP</span>
+        {% else %}<span class="pastila abatere">climatologie</span>{% endif %}
+      </td>
+      <td>{{ r.energie_reala_kwh | mw if r.energie_reala_kwh is not none else '—' }}</td>
+      <td>{{ r.energie_nwp_kwh | mw if r.energie_nwp_kwh is not none else '—' }}</td>
+      <td>{{ r.energie_climatologie_kwh | mw if r.energie_climatologie_kwh is not none else '— (fără date)' }}</td>
+      <td>{% if r.energie_climatologie_min_kwh is not none %}{{ r.energie_climatologie_min_kwh | mw }} – {{ r.energie_climatologie_max_kwh | mw }}{% else %}—{% endif %}</td>
+      <td>{{ r.numar_ani_folositi if r.numar_ani_folositi is not none else '—' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<p><a href="/parcuri/{{ parc.id }}">&larr; Înapoi la parc</a></p>
+{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+{% endblock %}
+{% block script %}
+<script>
+// datele vin din backend în kWh — conversia la MWh pentru afișare se face
+// aici, o singură dată (aceeași convenție ca restul aplicației: | mw în
+// Jinja pentru tabel, kwLaMw în JS pentru grafic).
+const kwLaMw = v => v === null || v === undefined ? v : v / 1000;
+const randuriLuna = {{ date.randuri | tojson }};
+if (document.getElementById('graficLuna') && randuriLuna.length) {
+  new Chart(document.getElementById('graficLuna'), {
+    type: 'bar',
+    data: {
+      labels: randuriLuna.map(r => r.data),
+      datasets: [
+        { label: 'Prognoză NWP (MWh)', data: randuriLuna.map(r => kwLaMw(r.energie_nwp_kwh)), backgroundColor: '#1a5fb4' },
+        { label: 'Climatologie (MWh)', data: randuriLuna.map(r => kwLaMw(r.energie_climatologie_kwh)), backgroundColor: '#c9a227' },
+      ]
+    },
+    options: { responsive: true,
+      scales: { y: { title: { display: true, text: 'MWh' } } } }
+  });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block titlu %}Documentație{% endblock %}
+{% block continut %}
+<h1>Documentație</h1>
+<p class="subtitlu">Documentația completă a aplicației, disponibilă direct în interfață — nu doar într-un README extern (R-1304).
+  Documentele detaliate (modelele matematice, jurnalul de depanare, sinteza cercetării) sunt în folderul
+  <code>docs/</code> din proiect.</p>
+
+<div class="card" style="border-left:4px solid #1f6f50">
+  <h3 style="margin-top:0">Ghiduri practice (folderul <code>docs/</code>)</h3>
+  <ul style="margin:6px 0 0 18px;padding:0">
+    <li><code>GHID_ACTUALIZARE.md</code> — cum se actualizează platforma în siguranță, cum se adaugă o
+      funcție nouă, harta codului pe straturi, ce trebuie urmărit la 50 de parcuri și capcanele de
+      performanță de evitat.</li>
+    <li><code>AGENTI.md</code> — unde ajută cu adevărat agenții AI în operarea platformei (triaj zilnic,
+      vânătoare de regresii, conversia fișierelor de import) și unde NU trebuie folosiți.</li>
+    <li><code>CHANGELOG.md</code> — ce s-a schimbat la fiecare versiune și, mai important, <em>de ce</em>.</li>
+    <li><code>LIMITARI.md</code> — ce nu face platforma și unde sunt marginile ei cunoscute.</li>
+  </ul>
+  <p class="text-mic" style="margin-bottom:0">Anduranța se poate verifica oricând, pe portofolii sintetice
+    de orice mărime: <code>python scripts/benchmark_scalare.py --parcuri 50</code>.</p>
+</div>
+
+<div class="card">
+<h2>1. Pornire &amp; operare zilnică</h2>
+<p>Aplicația rulează local, ca un singur proces (<code>uvicorn</code>), fără infrastructură de server — vezi <code>README.md</code> din rădăcina proiectului pentru comenzile exacte de instalare și pornire.</p>
+<p>Rularea automată zilnică (R-901-905) se programează din sistemul de operare (crontab / Programator de sarcini), cu <code>scripts/run_daily.py</code>. Pentru ziua în care platforma va rula pe un server permanent există și un workflow GitHub Actions pregătit (<code>.github/workflows/daily-forecast.yml</code>), care gestionează singur ora de vară/iarnă.</p>
+<p><strong>Ora contează.</strong> Piața pentru ziua următoare (PZU/OPCOM) se închide la 11:00, iar notificările fizice se depun până la 16:30 în ziua precedentă. O prognoză livrată după aceste ore nu mai poate fi folosită. Recomandarea: rularea zilnică să se încheie până la 09:00-10:00.</p>
+<p>Orice rulare — manuală sau programată — parcurge <strong>toate</strong> parcurile active, izolat: dacă un parc eșuează (ex. sursă meteo indisponibilă), celelalte parcuri nu sunt afectate (R-1603).</p>
+
+<h2>2. Cele două zone ale interfeței</h2>
+<p><strong>Panou</strong> — zona prietenoasă, ghidată, pentru operarea de zi cu zi: adăugare parc, rulare prognoză, verificarea acurateții, calitatea datelor, calibrare, import istoric, rapoarte, export CSV.</p>
+<p><strong>Modul tehnic</strong> — control complet, fără restricții, pe orice câmp din orice model de date (R-305), inclusiv modelele fizice avansate. Aceeași acțiune poate fi declanșată din oricare zonă, cu navigare bidirecțională (R-302, R-306).</p>
+
+<h2>3. Lanțul de calcul, pas cu pas</h2>
+<p><strong>a) Vremea.</strong> Se interoghează mai multe modele numerice simultan (implicit ECMWF IFS, GFS, ICON). Valorile se combină printr-o medie ponderată, iar dezacordul dintre modele devine o măsură a incertitudinii zilei. Ponderile pot fi fixe sau deduse automat din performanța recentă a fiecărui model pe acel parc anume.</p>
+<p><strong>b) Fizica.</strong> Pentru fotovoltaic: poziția solară la mijlocul intervalului, transpoziția radiației pe planul modulului (Perez), unghiul de incidență, temperatura celulei, puterea DC, limitarea invertorului, pierderile de sistem (inclusiv zăpadă și murdărire dinamică), degradarea, limita de injecție. Pentru eolian: extrapolarea vitezei la înălțimea butucului, corecția de densitate a aerului, netezirea curbei de putere cu turbulența, curba de putere, siajul, pierderile de sistem.</p>
+<p><strong>c) Corecția învățată.</strong> Un model de învățare automată corectează diferența rămasă între fizică și producția reală măsurată — umbriri nedeclarate, biasul local al modelului meteo, îmbătrânire. Nu prezice producția de la zero; corectează doar ce fizica nu poate ști.</p>
+<p><strong>d) Controalele de calitate.</strong> Fiecare oră trece prin verificări de plauzibilitate înainte să fie livrată.</p>
+<p><strong>e) Livrarea.</strong> Email către client (dacă parcul nu e în mod umbră), export CSV, raport lunar Excel.</p>
+
+<h2>4. Cum se citește acuratețea</h2>
+<p>Pagina <em>Verificare &amp; acuratețe</em> a fiecărui parc arată indicatorii calculați conform practicii din industrie:</p>
+<ul class="lista-simpla">
+  <li><strong>Baza de normalizare e declarată explicit.</strong> Un „nMAE de 5%” nu înseamnă nimic fără să se știe „5% din ce”. Implicit se raportează la puterea instalată (convenția operatorilor de sistem); se afișează și varianta raportată la producția medie (convenția traderilor), care dă mereu cifre mai mari.</li>
+  <li><strong>Orele de noapte sunt excluse</strong> la fotovoltaic. Incluse, ele fac indicatorul artificial de bun: zerourile de noapte se „prognozează” perfect și diluează erorile reale de peste zi.</li>
+  <li><strong>Orele cu probleme de calitate sunt excluse.</strong> O avarie de invertor sau o limitare de putere nu sunt erori de prognoză; ele se raportează separat.</li>
+  <li><strong>Scorul de skill</strong> compară prognoza cu o regulă simplă („mâine cerul va fi ca azi”, combinată cu media istorică). Un model care nu bate această referință nu aduce valoare, oricât de mic i-ar fi nMAE-ul.</li>
+  <li><strong>Defalcarea pe orizont.</strong> O valoare emisă cu 2 ore înainte nu e comparabilă cu una emisă cu 36 de ore înainte; amestecul lor flatează rezultatul.</li>
+</ul>
+
+<h2>5. Benzile de incertitudine (P10/P50/P90)</h2>
+<p>Când parcul are un model antrenat, prognoza include și un interval: P10 = valoarea sub care producția ar trebui să cadă în ~10% din cazuri, P90 în ~90%. Intervalul e <em>calibrat</em> pe date nevăzute la antrenare, adică lățimea lui e ajustată până când acoperirea observată corespunde cu cea promisă. Pagina de verificare arată acoperirea reală — dacă ea se depărtează de nivelul promis, banda e decorativă și trebuie reantrenat modelul.</p>
+<p>Benzile NU se însumează pe portofoliu: erorile parcurilor sunt parțial independente, deci incertitudinea totală e mai mică decât suma incertitudinilor individuale.</p>
+
+<h2>6. Calitatea datelor măsurate</h2>
+<p>Corectorul învață din diferența dintre producția măsurată și cea calculată. Dacă în măsurători există ore de avarie, limitări de putere, senzori blocați sau un decalaj de fus orar, modelul nu învață meteorologie — învață defecțiunile parcului și le împrăștie în toate prognozele viitoare.</p>
+<p>De aceea, după fiecare import, se rulează automat un control de calitate care marchează orele problematice. Ele sunt excluse din antrenare și raportate separat. Cea mai valoroasă verificare e detectarea decalajului de timp: un export făcut în altă convenție orară produce un decalaj constant, invizibil în orice indicator agregat, dar care strică sistematic tot ce urmează.</p>
+
+<h2>7. Straturile de siguranță</h2>
+<p><strong>Verificări de calitate pe prognoză</strong> — fiecare oră trece prin verificări: putere negativă sau peste puterea instalată (blocant), producție solară semnificativă noaptea (blocant), serie meteo suspect de constantă (avertisment), salt brusc față de rularea anterioară (avertisment), energie zilnică implauzibilă (avertisment). O oră blocată nu e livrată — rularea devine „parțial reușită”, nu eșuează complet și nu trimite date greșite (R-1503, R-1505).</p>
+<p><strong>Modul umbră</strong> — un parc nou intră automat în mod umbră: prognozele se calculează și se pot inspecta, dar email-ul <strong>nu</strong> se trimite niciodată cât timp parcul e în acest mod (R-1006) — verificarea e prima evaluată, înaintea oricărei alte logici.</p>
+<p><strong>Promovare controlată a modelelor</strong> — un model nou devine activ doar dacă bate modelul curent pe date nevăzute la antrenare. Dacă iese mai slab, rămâne salvat dar inactiv, iar versiunea veche continuă să lucreze: e un mecanism de revenire automată, fără intervenție manuală (R-605, R-1505).</p>
+<p><strong>Trasabilitate completă</strong> — orice rulare se poate inspecta oră cu oră: sursele interogate, valorile meteo, lanțul fizic, corecția aplicată și avertismentele (R-1201).</p>
+
+<h2>8. Rezoluția de 15 minute</h2>
+<p>Decontarea pe piața din România se face la 15 minute, iar cuplarea pieței pentru ziua următoare a trecut la intervale de 15 minute din octombrie 2025. Fiecare parc poate fi comutat pe pas de sfert de oră din Modul tehnic. Modelele meteo livrează date orare; trecerea la 15 minute se face interpolând <em>indicele de senin</em> (raportul față de cerul senin), nu valorile brute de radiație — altfel energia s-ar deplasa în interiorul orei, mai ales la răsărit și apus.</p>
+
+<h2>9. Migrarea către Firestore</h2>
+<p>Persistența e izolată în spatele unei interfețe unice. Implementarea curentă folosește SQLite local; o implementare paralelă pentru Firestore există deja, cu aceeași interfață. Migrarea se face schimbând o singură setare (<code>STORAGE_BACKEND</code> în <code>.env</code>), fără a rescrie nicio logică de business — vezi <a href="/tehnic/cod-sursa">Cod sursă &amp; arhitectură</a>.</p>
+
+<h2>10. Limitări cunoscute (volum de date, scalare)</h2>
+<p>Analiză completă, verificată direct în cod, în <code>docs/LIMITARI.md</code>. Cifrele de mai jos sunt
+  MĂSURATE la 50 de parcuri (un an de producție, 90 de rulări arhivate per parc), cu
+  <code>scripts/benchmark_scalare.py</code> — nu estimate. Pe scurt:</p>
+<ul class="lista-simpla">
+  <li><strong>La 50 de parcuri platforma se comportă bine</strong>: paginile se încarcă sub o secundă,
+    iar rularea zilnică a întregului portofoliu durează ~1,5 minute, din care mai mult de jumătate e
+    strict așteptare după Open-Meteo.</li>
+  <li><strong>Stocarea crește tăcut</strong>: arhiva de rulări adaugă ordinul unui gigabyte pe an la 50 de
+    parcuri — adică exact cota gratuită de stocare Firestore, atinsă în ~un an. Se eliberează din
+    <a href="/tehnic/intretinere">Întreținere &amp; retenție</a>, fără a atinge producția reală sau modelele.</li>
+  <li><strong>Limita de 1 MiB per document Firestore</strong> e TARE: o rulare de 16 zile la pas de 15 minute
+    ocupă ~0,81 MiB (81% din limită). Nu combinați orizont maxim cu pas de 15 minute pe același parc.</li>
+  <li><strong>SQLite scrie serial</strong> (un singur lock, R-201) — corect pentru un operator, devine gâtul de sticlă abia la câteva sute de parcuri. Citirile sunt sigure din mai multe fire (SQLite e compilat în mod „serialized").</li>
+  <li><strong>Firestore, chiar împachetat pe zi</strong> (§9 mai sus), poate epuiza cota gratuită la un import istoric dintr-o dată pentru un portofoliu mare — recomandat eșalonat.</li>
+  <li><strong>Rularea zilnică e secvențială</strong>, parc cu parc — timpul crește liniar cu numărul de parcuri; peste ~150 de parcuri ar merita paralelizate cererile meteo.</li>
+  <li><strong>Orizontul de prognoză NWP e maximum 16 zile</strong> — o limită fizică a modelelor meteo, nu a aplicației; orice „prognoză pe o lună" e climatologie, nu meteorologie, și trebuie etichetată distinct.</li>
+  <li><strong>Antrenarea ML cere minimum ~1500 ore</strong> de istoric util (R-606) și reface modelul de la zero de fiecare dată — fără antrenare incrementală.</li>
+  <li><strong>Copia de rezervă completă</strong> (secțiunea „Copie de rezervă &amp; restaurare" din Modul tehnic) se construiește integral în memorie, dintr-o singură cerere — practică pentru portofolii mici-medii, poate deveni lentă la portofolii foarte mari.</li>
+  <li><strong>Fără autentificare</strong> — aplicația presupune un singur operator de încredere (R-201); Modul tehnic e explicit fără restricții.</li>
+</ul>
+</div>
+
+<p style="margin-top:16px"><a href="/tehnic">&larr; Modul tehnic</a></p>
+{% endblock %}

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block titlu %}Diagnostic meteo — {{ parc.nume }}{% endblock %}
+{% block continut %}
+<h1>Diagnostic meteo</h1>
+<p class="subtitlu">{{ parc.nume }} ({{ parc.cod }}) — zonă de siguranță: nu există un „import” de date
+  meteo dintr-un fișier — sursele configurate (R-501) se interoghează live la fiecare rulare de
+  prognoză. Aici se vede cât de des a răspuns fiecare sursă pe ultimele
+  {{ diagnostic.rulari_analizate }} rulări, ca o sursă tăcut absentă să nu treacă neobservată.</p>
+
+<div class="actiuni">
+  <a class="buton secundar" href="/parcuri/{{ parc.id }}">&larr; Înapoi la parc</a>
+</div>
+
+{% if diagnostic.fara_rulari %}
+<div class="card">
+  <p>Nu există încă nicio rulare pentru acest parc — rulați prognoza cel puțin o dată (butonul
+    „Recalculează prognoza” din pagina parcului) ca să apară date aici.</p>
+</div>
+{% else %}
+
+{% if diagnostic.are_probleme %}
+<div class="avertisment">O sursă meteo configurată răspunde sub 80% din rulările recente — vedeți
+  tabelul de mai jos. Ansamblul renormalizează automat ponderile (rularea nu se strică), dar
+  înseamnă mai puțină diversitate de modele decât e configurat.</div>
+{% else %}
+<div class="succes">Toate sursele meteo configurate răspund constant pe rulările recente.</div>
+{% endif %}
+
+{% if diagnostic.ultima_stare and diagnostic.ultima_stare != 'reusita' %}
+<div class="{{ 'eroare' if diagnostic.ultima_stare == 'esuata' else 'avertisment' }}">
+  Ultima rulare ({{ diagnostic.ultima_declansata_la[:16].replace('T',' ') }} UTC) e
+  <strong>{{ diagnostic.ultima_stare }}</strong>{% if diagnostic.ultima_mesaj %}: {{ diagnostic.ultima_mesaj }}{% endif %}
+</div>
+{% endif %}
+
+<div class="card">
+  <table>
+    <tr><th>Sursă meteo</th><th>Răspunsuri</th><th>Din rulări</th><th>% răspuns</th><th>Ultima pondere folosită</th></tr>
+    {% for r in diagnostic.randuri %}
+    <tr {{ 'style="color:#c0392b;font-weight:600"' if r.problema else '' }}>
+      <td>{{ r.sursa }}</td>
+      <td>{{ r.raspunsuri }}</td>
+      <td>{{ r.total }}</td>
+      <td>{{ (r.procent ~ '%') if r.procent is not none else '—' }}</td>
+      <td>{{ '%.2f'|format(r.ultima_pondere) if r.ultima_pondere is not none else '—' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p class="text-mic">Sursele meteo se configurează per parc, din Modul tehnic
+    (<a href="/tehnic/parcuri/{{ parc.id }}">configurare parc</a>) — câmpul „Surse meteo”.</p>
+</div>
+
+{% endif %}
+
+<p><a href="/parcuri/{{ parc.id }}">&larr; Înapoi la parc</a></p>
+{% endblock %}

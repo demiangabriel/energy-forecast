@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block titlu %}Întreținere și retenție{% endblock %}
+{% block continut %}
+<h1>Întreținere și retenție</h1>
+<p class="subtitlu">Cât spațiu ocupă datele platformei și ce se poate elibera fără pierderi.</p>
+
+{% if mesaj %}<div class="info">{{ mesaj }}</div>{% endif %}
+
+<div class="grid grid-3" style="margin:16px 0">
+  <div class="card kpi"><span class="val">{{ info.numar_parcuri }}</span><span class="eticheta">parcuri configurate</span></div>
+  <div class="card kpi"><span class="val">{{ info.marime_mb if info.marime_mb is not none else '—' }}</span><span class="eticheta">MB bază de date</span></div>
+  <div class="card kpi"><span class="val">{{ info.backend }}</span><span class="eticheta">depozit de date</span></div>
+</div>
+
+<div class="card">
+  <h3>De ce cresc datele</h3>
+  <p class="text-mic">Rularea zilnică lasă câte o rulare arhivată pe zi, per parc, iar fiecare rulare
+    păstrează toate orele ei de prognoză (pentru trasabilitate, R-1201). La 50 de parcuri asta înseamnă
+    ordinul unui <strong>gigabyte pe an</strong>. Local e doar un fișier mare; pe Firestore înseamnă
+    depășirea cotei gratuite de stocare (1 GiB) în aproximativ un an de funcționare normală.</p>
+  <p class="text-mic">Cache-ul meteo (reanaliza folosită de „Reală vs. prognoză — meteo") nu se golește
+    niciodată singur: fiecare zi vizualizată rămâne salvată definitiv. E doar un cache — ștergerea lui nu
+    pierde nimic, doar face ca o re-vizualizare a acelorași zile să ceară din nou datele de la sursă.</p>
+</div>
+
+<div class="card" style="margin-top:16px;max-width:720px">
+  <h3>Curățare</h3>
+  <p class="text-mic">Ce NU se atinge niciodată: producția reală importată, modelele ML antrenate,
+    configurarea parcurilor, jurnalul de emailuri. Se șterge doar istoricul „ce am prognozat atunci".
+    Verificarea acurateței și ponderile adaptive privesc oricum ferestre recente (30–90 de zile),
+    deci o retenție de ordinul unui an nu le afectează.</p>
+  <form method="post" action="/tehnic/intretinere/curata"
+        onsubmit="return confirm('Sigur ștergeți datele istorice selectate? Operația nu se poate anula.')"
+        style="display:flex;gap:12px;align-items:end;flex-wrap:wrap">
+    <div class="camp">
+      <label>Șterge rulările mai vechi de (zile)</label>
+      <input name="zile_rulari" placeholder="ex. 400" inputmode="numeric">
+      <div class="explicatie">Lăsați gol ca să nu ștergeți rulări. Minim acceptat: 30 de zile.</div>
+    </div>
+    <div class="camp">
+      <label>Golește cache-ul meteo mai vechi de (zile)</label>
+      <input name="zile_cache" placeholder="ex. 90" inputmode="numeric">
+      <div class="explicatie">Lăsați gol ca să nu atingeți cache-ul.</div>
+    </div>
+    <button class="buton pericol" type="submit">Curăță</button>
+  </form>
+</div>
+
+<p style="margin-top:16px"><a href="/tehnic">&larr; Înapoi la modul tehnic</a></p>
+{% endblock %}

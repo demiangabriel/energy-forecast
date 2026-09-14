@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block titlu %}Copie de rezervă & restaurare{% endblock %}
+{% block continut %}
+<h1>Copie de rezervă &amp; restaurare</h1>
+<p class="subtitlu">Zonă tehnică (R-305) — descărcare și restaurare a datelor, fără restricții. Restaurarea este
+  întotdeauna ADITIVĂ: un parc/rând existent se actualizează, nu se șterge și recreează; nimic din ce e deja
+  în bază nu se pierde restaurând o copie mai veche.</p>
+
+{% if eroare %}
+<div class="eroare">{{ eroare }}</div>
+{% endif %}
+
+<h2>1. Toate parcurile (configurație)</h2>
+<div class="card" style="max-width:720px">
+  <p>Adaugă automat toate parcurile dintr-o copie de rezervă descărcată anterior
+    (Panou &rarr; „Copie de rezervă parcuri”, format .xlsx sau .csv). Parcurile potrivite după COD se
+    actualizează; codurile noi se creează ca parcuri noi.</p>
+  <div class="actiuni" style="margin-bottom:14px">
+    <a class="buton secundar" href="/rezerva/parcuri.xlsx">Descarcă copia curentă (.xlsx)</a>
+    <a class="buton secundar" href="/rezerva/parcuri.csv">Descarcă copia curentă (.csv)</a>
+  </div>
+  <form class="form-simplu" method="post" action="/tehnic/rezerva/parcuri" enctype="multipart/form-data">
+    <div class="camp">
+      <label>Fișier de restaurat (.xlsx sau .csv)</label>
+      <input type="file" name="fisier" accept=".xlsx,.csv" required>
+    </div>
+    <button class="buton" type="submit">Restaurează parcurile</button>
+  </form>
+
+  {% if rezultat_parcuri %}
+  <div class="card" style="margin-top:16px;background:var(--fundal-alternativ,#f4f6f5)">
+    <p><strong>{{ rezultat_parcuri.adaugati | length }}</strong> parc(uri) adăugate,
+       <strong>{{ rezultat_parcuri.actualizati | length }}</strong> actualizate.</p>
+    {% if rezultat_parcuri.adaugati %}<p class="text-mic">Adăugate: {{ rezultat_parcuri.adaugati | join(', ') }}</p>{% endif %}
+    {% if rezultat_parcuri.actualizati %}<p class="text-mic">Actualizate: {{ rezultat_parcuri.actualizati | join(', ') }}</p>{% endif %}
+    {% if rezultat_parcuri.erori %}
+    <div class="eroare"><strong>{{ rezultat_parcuri.erori | length }} eroare/erori:</strong>
+      <ul style="margin:6px 0 0 18px;padding:0">{% for e in rezultat_parcuri.erori[:30] %}<li>{{ e }}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<h2>2. Copie de rezervă COMPLETĂ (tot: prognoze, producție realizată, calitate, modele ML, setări)</h2>
+<div class="card" style="max-width:720px">
+  <p>Spre deosebire de copia de mai sus (doar configurația parcurilor), copia completă include și istoricul
+    de producție reală importat, toate rulările de prognoză (secțiunea 8), verdictele de control al calității,
+    metadatele modelelor ML antrenate și setările globale de operare. Format JSON, fidel 1:1.</p>
+  <p class="text-mic">Nu include fișierele antrenate (.txt) ale modelelor ML — doar metadatele lor; după o
+    restaurare pe alt mediu, modelele trebuie reantrenate (secțiunea 8). Prognozele fizice și istoricul rămân
+    intacte oricum.</p>
+  <div class="actiuni" style="margin-bottom:14px">
+    <a class="buton secundar" href="/tehnic/rezerva/complet.json">Descarcă copia completă (.json)</a>
+  </div>
+  <form class="form-simplu" method="post" action="/tehnic/rezerva/complet" enctype="multipart/form-data">
+    <div class="camp">
+      <label>Fișier de restaurat (.json)</label>
+      <input type="file" name="fisier" accept=".json" required>
+    </div>
+    <button class="buton" type="submit">Restaurează copia completă</button>
+  </form>
+
+  {% if rezultat_restaurare %}
+    {% if rezultat_restaurare.eroare %}
+    <div class="eroare">{{ rezultat_restaurare.eroare }}</div>
+    {% else %}
+    <div class="card" style="margin-top:16px;background:var(--fundal-alternativ,#f4f6f5)">
+      <p>Restaurat: <strong>{{ rezultat_restaurare.clienti }}</strong> clienți,
+         <strong>{{ rezultat_restaurare.parcuri }}</strong> parcuri,
+         <strong>{{ rezultat_restaurare.ore_productie }}</strong> ore de producție reală,
+         <strong>{{ rezultat_restaurare.verdicte_calitate }}</strong> verdicte de calitate,
+         <strong>{{ rezultat_restaurare.rulari }}</strong> rulări de prognoză,
+         <strong>{{ rezultat_restaurare.modele_ml }}</strong> metadate de modele ML,
+         <strong>{{ rezultat_restaurare.setari }}</strong> setări.</p>
+      {% if rezultat_restaurare.erori %}
+      <div class="eroare"><strong>{{ rezultat_restaurare.erori | length }} eroare/erori (restul s-a restaurat oricum):</strong>
+        <ul style="margin:6px 0 0 18px;padding:0">{% for e in rezultat_restaurare.erori[:30] %}<li>{{ e }}</li>{% endfor %}</ul>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+  {% endif %}
+</div>
+
+<p><a href="/tehnic">&larr; Înapoi la modulul tehnic</a></p>
+{% endblock %}

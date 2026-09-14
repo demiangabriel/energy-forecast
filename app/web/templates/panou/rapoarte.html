@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block titlu %}Rapoarte — {{ parc.nume }}{% endblock %}
+{% block continut %}
+<h1>Rapoarte și comparații</h1>
+<p class="subtitlu">{{ parc.nume }} ({{ parc.cod }}) — raport lunar descărcabil (R-1202), comparație oră cu oră, cu formule reale (se recalculează dacă editați datele brute).</p>
+
+<div class="card" style="max-width:480px">
+  <form class="form-simplu" method="get" action="/parcuri/{{ parc.id }}/rapoarte/descarca">
+    <div class="camp"><label>An</label><input type="number" name="an" value="{{ an }}" min="2020" max="2100" required></div>
+    <div class="camp"><label>Lună</label>
+      <select name="luna">
+        {% for l in range(1,13) %}<option value="{{ l }}" {{ 'selected' if l == luna else '' }}>{{ '%02d'|format(l) }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="camp"><label>Fus orar afișat (coloana de oră locală)</label>
+      <div class="explicatie">Timestamp-ul UTC brut rămâne oricum în raport, într-o coloană separată —
+        alegerea de aici schimbă doar fusul în care se citește ora locală.</div>
+      <select name="fus_orar">
+        {% for valoare, eticheta in fusuri %}
+        <option value="{{ valoare }}" {{ 'selected' if valoare == parc.fus_orar else '' }}>{{ eticheta }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="camp"><label>Format timestamp</label>
+      <div class="explicatie">Același format ca la exportul CSV — platforma scrie toate fișierele la
+        fel. Implicit include decalajul de fus orar, deci fișierul e neambiguu la schimbarea orei și
+        poate fi reimportat fără conversie.</div>
+      <select name="format_timp">
+        {% for cheie, info in formate_timp.items() %}
+        <option value="{{ cheie }}" {{ 'selected' if cheie == format_timp_implicit else '' }}>
+          {{ info.eticheta }} — {{ info.exemplu }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button class="buton" type="submit">Descarcă raport (.xlsx)</button>
+  </form>
+</div>
+
+<p><a href="/parcuri/{{ parc.id }}">&larr; Înapoi la parc</a></p>
+{% endblock %}

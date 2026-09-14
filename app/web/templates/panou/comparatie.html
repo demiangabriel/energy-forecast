@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block titlu %}Comparație producție — {{ parc.nume }}{% endblock %}
+{% block continut %}
+<h1>Reală vs. prognoză</h1>
+<p class="subtitlu">{{ parc.nume }} ({{ parc.cod }}) — producția reală alături de fiecare etapă a prognozei:
+  modelul fizic (înainte de orice corecție), corecția aplicată de modelul ML, și valoarea finală
+  raportată. Dezechilibrul e |producție reală − prognoză finală|, în MW.</p>
+
+<div class="actiuni">
+  {% for z in [7, 14, 30, 90] %}
+  <a class="buton {{ '' if (z == zile and not interval_manual) else 'secundar' }}" href="/parcuri/{{ parc.id }}/comparatie?zile={{ z }}">Ultimele {{ z }} zile</a>
+  {% endfor %}
+  <a class="buton secundar" href="/parcuri/{{ parc.id }}">&larr; Înapoi la parc</a>
+</div>
+
+<div class="card" style="max-width:480px;margin-bottom:16px">
+  <form class="form-simplu" method="get" action="/parcuri/{{ parc.id }}/comparatie" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+    <div class="camp"><label>De la</label><input type="date" name="inceput" value="{{ date.inceput_data }}" required></div>
+    <div class="camp"><label>Până la</label><input type="date" name="sfarsit" value="{{ date.sfarsit_data }}" required></div>
+    <button class="buton {{ 'secundar' if not interval_manual else '' }}" type="submit">Interval ales</button>
+  </form>
+  <p class="text-mic" style="margin:8px 0 0">Datele sunt calendaristice, în fusul parcului ({{ parc.fus_orar }}).</p>
+</div>
+
+{% if not date.randuri %}
+<div class="card">
+  <p>Nu există încă date suficiente — e nevoie de producție reală importată și de cel puțin o prognoză salvată pentru aceleași ore.</p>
+</div>
+{% else %}
+
+<div class="grid grid-4" style="margin:16px 0">
+  <div class="card kpi"><span class="val">{{ date.energie_reala_kwh | mw if date.energie_reala_kwh is not none else '—' }}</span><span class="eticheta">MWh reali (perioadă)</span></div>
+  <div class="card kpi"><span class="val">{{ date.energie_fizic_kwh | mw if date.energie_fizic_kwh is not none else '—' }}</span><span class="eticheta">MWh prognozați — fizic</span></div>
+  <div class="card kpi"><span class="val">{{ date.energie_finala_kwh | mw if date.energie_finala_kwh is not none else '—' }}</span><span class="eticheta">MWh prognozați — final (după ML)</span></div>
+  <div class="card kpi"><span class="val">{{ date.dezechilibru_mediu_kw | mw if date.dezechilibru_mediu_kw is not none else '—' }}</span><span class="eticheta">dezechilibru mediu orar (MW)</span></div>
+</div>
+<p class="text-mic" style="margin-top:-8px">{{ date.numar_ore_comune }} ore cu producție reală și prognoză finală disponibile simultan, din ultimele {{ date.zile }} zile.</p>
+
+<div class="card">
+  <canvas id="graficComparatieCompleta" height="90"></canvas>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <table>
+    <tr><th>Oră ({{ parc.fus_orar }})</th><th>Reală (MW)</th><th>Fizic (MW)</th><th>Corecție ML (MW)</th><th>Final (MW)</th><th>Dezechilibru (MW)</th></tr>
+    {% for r in date.randuri[:500] %}
+    <tr>
+      <td>{{ r.timestamp }}</td>
+      <td>{{ r.reala_kwh | mw if r.reala_kwh is not none else '—' }}</td>
+      <td>{{ r.fizic_kw | mw if r.fizic_kw is not none else '—' }}</td>
+      <td>{{ r.corectie_ml_kw | mw if r.corectie_ml_kw is not none else '—' }}</td>
+      <td><strong>{{ r.final_kw | mw if r.final_kw is not none else '—' }}</strong></td>
+      <td>{{ r.dezechilibru_kw | mw if r.dezechilibru_kw is not none else '—' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% if date.randuri | length > 500 %}
+  <p class="text-mic">Se afișează cele mai recente 500 de ore din {{ date.randuri | length }} — graficul de mai sus acoperă totuși toată perioada selectată.</p>
+  {% endif %}
+</div>
+{% endif %}
+
+<p><a href="/parcuri/{{ parc.id }}">&larr; Înapoi la parc</a></p>
+{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+{% endblock %}
+{% block script %}
+<script>
+const randuri = {{ (date.randuri | reverse | list) | tojson }};
+const kwLaMw = v => v === null || v === undefined ? v : v / 1000;
+if (document.getElementById('graficComparatieCompleta') && randuri.length) {
+  new Chart(document.getElementById('graficComparatieCompleta'), {
+    type: 'line',
+    data: {
+      labels: randuri.map(r => r.timestamp),
+      datasets: [
+        { label: 'Reală (MW)', data: randuri.map(r => kwLaMw(r.reala_kwh)), borderColor: '#1f6f50', borderWidth: 2, pointRadius: 0, tension: .2 },
+        { label: 'Fizic (MW)', data: randuri.map(r => kwLaMw(r.fizic_kw)), borderColor: '#5f6b6d', borderDash: [4,3], pointRadius: 0, tension: .2 },
+        { label: 'Final — după ML (MW)', data: randuri.map(r => kwLaMw(r.final_kw)), borderColor: '#1a5fb4', pointRadius: 0, tension: .2 },
+        { label: 'Dezechilibru (MW)', data: randuri.map(r => kwLaMw(r.dezechilibru_kw)), borderColor: '#c0392b', borderWidth: 1, pointRadius: 0, tension: .2, hidden: true },
+      ]
+    },
+    options: { responsive: true, interaction: {mode: 'index', intersect: false},
+      scales: { y: { title: { display: true, text: 'MW' } } } }
+  });
+}
+</script>
+{% endblock %}

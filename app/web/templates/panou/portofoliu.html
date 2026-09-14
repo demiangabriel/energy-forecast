@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block titlu %}Portofoliu{% endblock %}
+{% block continut %}
+<h1>Portofoliu</h1>
+<p class="subtitlu">Toate parcurile dintr-o privire — stare, energie prognozată pentru mâine, abatere față de ziua precedentă.</p>
+
+<div class="actiuni">
+  <a class="buton" href="/parcuri/noua">+ Adaugă parc nou</a>
+  <a class="buton secundar" href="/ghid">Ghid de pornire</a>
+  <a class="buton secundar" href="/rezerva/parcuri.xlsx">Copie de rezervă (Excel)</a>
+  <a class="buton secundar" href="/rezerva/parcuri.csv">Copie de rezervă (CSV)</a>
+</div>
+
+{% if numaratoare.toate %}
+<div class="filtre" role="group" aria-label="Filtrează după tehnologie">
+  <a class="filtru {{ 'activ' if not filtru else '' }}" href="/">Toate
+    <span class="numar">{{ numaratoare.toate }}</span></a>
+  <a class="filtru {{ 'activ' if filtru == 'fotovoltaic' else '' }}" href="/?tehnologie=fotovoltaic">Fotovoltaic
+    <span class="numar">{{ numaratoare.fotovoltaic }}</span></a>
+  <a class="filtru {{ 'activ' if filtru == 'eolian' else '' }}" href="/?tehnologie=eolian">Eolian
+    <span class="numar">{{ numaratoare.eolian }}</span></a>
+</div>
+{% endif %}
+
+{% if not randuri %}
+<div class="card">
+  {% if filtru %}
+  <p>Niciun parc {{ 'fotovoltaic' if filtru == 'fotovoltaic' else 'eolian' }} în portofoliu.
+    <a href="/">Vedeți toate parcurile</a>.</p>
+  {% else %}
+  <p>Nu aveți încă niciun parc în portofoliu.</p>
+  <a class="buton" href="/parcuri/noua">Adăugați primul parc</a>
+  {% endif %}
+</div>
+{% else %}
+{% if filtru %}
+<p class="text-mic" style="margin:-4px 0 14px">Cifrele de mai jos se referă doar la parcurile
+  {{ 'fotovoltaice' if filtru == 'fotovoltaic' else 'eoliene' }} ({{ randuri | length }} din {{ numaratoare.toate }}).</p>
+{% endif %}
+
+<div class="grid grid-4" style="margin-bottom:18px">
+  <div class="card kpi"><span class="val">{{ total.numar_parcuri }}</span><span class="eticheta">parcuri în portofoliu</span></div>
+  <div class="card kpi"><span class="val">{{ total.putere_instalata_kw | mw }}</span><span class="eticheta">MW instalați (total)</span></div>
+  <div class="card kpi"><span class="val">{{ total.energie_maine_kwh | mw }}</span><span class="eticheta">MWh prognozați pentru mâine</span></div>
+  <div class="card kpi">
+    <span class="val">{{ total.pe_stare.get('livrat', 0) }}/{{ total.numar_parcuri }}</span>
+    <span class="eticheta">parcuri în stare „livrat"</span>
+  </div>
+</div>
+{% if total.energie_maine_kwh %}
+<p class="text-mic" style="margin-top:-8px">Energia totală se poate însuma direct. Benzile de incertitudine
+  NU se însumează: erorile parcurilor sunt parțial independente, deci incertitudinea portofoliului e mai mică
+  decât suma incertitudinilor individuale.</p>
+{% endif %}
+<div class="grid grid-carduri">
+  {% for r in randuri %}
+  <a class="card card-parc" href="/parcuri/{{ r.parc.id }}">
+    <div class="rand-titlu">
+      <div>
+        <div class="nume">{{ r.parc.nume }}</div>
+        <div class="cod">{{ r.parc.cod }} · {{ 'Fotovoltaic' if r.parc.tehnologie.value == 'fotovoltaic' else 'Eolian' }}</div>
+      </div>
+      <span class="pastila {{ r.stare }}">
+        {% if r.stare == 'livrat' %}Livrat
+        {% elif r.stare == 'abatere' %}Abatere
+        {% elif r.stare == 'mod_umbra' %}Mod umbră
+        {% elif r.stare == 'doar_fizic' %}Doar fizic
+        {% else %}Fără date{% endif %}
+      </span>
+    </div>
+    <div class="indicatori">
+      <div class="indicator">
+        <div class="val">{{ r.energie_maine_kwh | mw }}</div>
+        <div class="eticheta">MWh mâine</div>
+      </div>
+      <div class="indicator">
+        <div class="val">{{ r.varf_maine_kw | mw }}</div>
+        <div class="eticheta">vârf mâine (MW)</div>
+      </div>
+      <div class="indicator">
+        <div class="val">{{ r.abatere_ieri_pct | pct }}</div>
+        <div class="eticheta">abatere vs. ieri</div>
+      </div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

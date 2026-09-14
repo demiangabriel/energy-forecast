@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block titlu %}Adaugă parc{% endblock %}
+{% block continut %}
+<h1>Adaugă parc nou</h1>
+
+{% if not tehnologie %}
+<p class="subtitlu">Alegeți tehnologia (R-402) — formularul următor arată doar câmpurile relevante.</p>
+<div class="grid grid-2" style="max-width:640px">
+  <a class="card card-parc" href="/parcuri/noua?tehnologie=fotovoltaic">
+    <h3>Fotovoltaic</h3>
+    <div class="nume">☀️ Parc solar</div>
+  </a>
+  <a class="card card-parc" href="/parcuri/noua?tehnologie=eolian">
+    <h3>Eolian</h3>
+    <div class="nume">🌬️ Parc eolian</div>
+  </a>
+</div>
+{% else %}
+<p class="subtitlu">
+  {{ 'Fotovoltaic' if tehnologie == 'fotovoltaic' else 'Eolian' }} —
+  <a href="/parcuri/noua">schimbă tehnologia</a> ·
+  <a href="/sabloane/{{ 'pv' if tehnologie == 'fotovoltaic' else 'eolian' }}.xlsx">descarcă șablon Excel pentru completare offline (R-407)</a>
+</p>
+
+{% if erori %}
+<div class="eroare"><strong>Nu s-a putut salva:</strong>
+  <ul style="margin:6px 0 0 18px;padding:0">{% for e in erori %}<li>{{ e }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+<form class="form-simplu" method="post" action="/parcuri/noua">
+  <input type="hidden" name="tehnologie" value="{{ tehnologie }}">
+
+  <fieldset>
+    <legend>Identificare</legend>
+    <div class="camp"><label>Cod parc <span class="importanta important">important</span></label>
+      <input name="cod" required placeholder="ex: PV-BRG-01"></div>
+    <div class="camp"><label>Nume <span class="importanta important">important</span></label>
+      <input name="nume" required></div>
+    <div class="camp"><label>Client <span class="importanta important">important</span></label>
+      <select name="client_id" id="client_id" onchange="document.getElementById('client_nou_wrap').hidden = this.value !== '__nou__'">
+        <option value="">-- alegeți --</option>
+        {% for c in clienti %}<option value="{{ c.id }}">{{ c.nume }}</option>{% endfor %}
+        <option value="__nou__">+ Client nou</option>
+      </select>
+    </div>
+    <div class="camp" id="client_nou_wrap" hidden>
+      <label>Nume client nou</label>
+      <input name="client_nume_nou" placeholder="Numele companiei/proprietarului">
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Locație</legend>
+    <div class="camp"><label>Latitudine <span class="importanta important">important</span></label>
+      <input name="latitudine" type="text" required placeholder="ex: 44.4268"></div>
+    <div class="camp"><label>Longitudine <span class="importanta important">important</span></label>
+      <input name="longitudine" type="text" required placeholder="ex: 26.1025"></div>
+    <div class="camp"><label>Altitudine (m) <span class="importanta optional">opțional</span></label>
+      <div class="explicatie">Impact sub 0,1% pe rezultat.</div>
+      <input name="altitudine_m" type="text" placeholder="0"></div>
+    <div class="camp"><label>Fus orar <span class="importanta important">important</span></label>
+      <div class="explicatie">Fusul orar al parcului — folosit atât la interpretarea orelor locale din
+        fișierele CSV importate (secțiunea 11), cât și la afișarea prognozelor (ce înseamnă „ziua
+        curentă”/„mâine” pentru acest parc). Nu e neapărat fusul aplicației (România/Moldova):
+        lista acoperă și alte țări din regiune. Se poate schimba oricând din zona tehnică.</div>
+      <select name="fus_orar">
+        {% for valoare, eticheta in fusuri %}
+        <option value="{{ valoare }}">{{ eticheta }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="camp"><label>Fus orar import <span class="importanta optional">opțional</span></label>
+      <div class="explicatie">Doar dacă exportul din SCADA/contor folosește o convenție orară diferită de
+        fusul ales mai sus (ex. fără oră de vară/iarnă) — gol înseamnă „identic cu fusul de mai sus”.
+        Se poate completa oricând mai târziu, inclusiv direct din pagina de import.</div>
+      <select name="fus_orar_import">
+        <option value="">-- identic cu fusul de mai sus --</option>
+        {% for valoare, eticheta in fusuri %}
+        <option value="{{ valoare }}">{{ eticheta }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </fieldset>
+
+  {% if tehnologie == 'fotovoltaic' %}
+  <fieldset>
+    <legend>Configurație fotovoltaică</legend>
+    <div class="camp"><label>Putere DC (kWp) <span class="importanta important">important</span></label>
+      <input name="putere_dc_kwp" type="text" required></div>
+    <div class="camp"><label>Putere AC / invertor (kW) <span class="importanta important">important</span></label>
+      <input name="putere_ac_kw" type="text" required></div>
+    <div class="camp"><label>Tip așezare <span class="importanta important">important</span></label>
+      <div class="explicatie">Impact 20-40% pe producție.</div>
+      <select name="tip_asezare">
+        <option value="fixed">fixed (fix, o singură orientare)</option>
+        <option value="east_west">east_west (est-vest)</option>
+        <option value="tracker">tracker (urmărire pe un ax)</option>
+      </select>
+    </div>
+    <div class="camp"><label>Înclinare (grade) <span class="importanta optional">opțional*</span></label>
+      <div class="explicatie">Dacă nu o știți exact, lăsați gol — poate fi dedusă ulterior prin calibrare (secțiunea 7).</div>
+      <input name="inclinare_grade" type="text" placeholder="ex: 25"></div>
+    <div class="camp"><label>Azimut (grade) <span class="importanta optional">opțional*</span></label>
+      <div class="explicatie">180 = sud. Poate fi dedus prin calibrare dacă lipsește.</div>
+      <input name="azimut_grade" type="text" placeholder="ex: 180"></div>
+    <div class="camp"><label>Tehnologie panou <span class="importanta optional">opțional</span></label>
+      <select name="tehnologie_panou">
+        <option value="monocrystalline">monocrystalline</option>
+        <option value="polycrystalline">polycrystalline</option>
+        <option value="PERC_TOPCon_HJT">PERC/TOPCon/HJT</option>
+        <option value="thin_film">thin_film</option>
+        <option value="bifacial">bifacial</option>
+      </select>
+    </div>
+  </fieldset>
+  {% else %}
+  <fieldset>
+    <legend>Configurație eoliană</legend>
+    <div class="camp"><label>Număr turbine <span class="importanta important">important</span></label>
+      <input name="numar_turbine" type="text" required></div>
+    <div class="camp"><label>Putere nominală per turbină (kW) <span class="importanta important">important</span></label>
+      <input name="putere_nominala_kw" type="text" required></div>
+    <div class="camp"><label>Înălțime butuc (m) <span class="importanta important">important</span></label>
+      <div class="explicatie">Vântul crește mult cu înălțimea.</div>
+      <input name="inaltime_butuc_m" type="text" required></div>
+    <div class="camp"><label>Viteză pornire (m/s) <span class="importanta optional">opțional*</span></label>
+      <input name="viteza_pornire_ms" type="text" placeholder="ex: 3"></div>
+    <div class="camp"><label>Viteză nominală (m/s) <span class="importanta optional">opțional*</span></label>
+      <input name="viteza_nominala_ms" type="text" placeholder="ex: 12"></div>
+    <div class="camp"><label>Viteză oprire (m/s) <span class="importanta optional">opțional*</span></label>
+      <div class="explicatie">*Folosite dacă nu aveți curba exactă a producătorului — o puteți introduce ulterior din Modul tehnic.</div>
+      <input name="viteza_oprire_ms" type="text" placeholder="ex: 25"></div>
+  </fieldset>
+  {% endif %}
+
+  <fieldset>
+    <legend>Email client <span class="importanta optional">opțional</span></legend>
+    <div class="camp"><label>Destinatari (separați prin virgulă)</label>
+      <input name="destinatari_email" type="text" placeholder="client@exemplu.ro, contabil@exemplu.ro"></div>
+  </fieldset>
+
+  <div class="actiuni">
+    <button class="buton" type="submit">Salvează parcul</button>
+  </div>
+  <p class="text-mic">Parcul pornește automat în „mod umbră" — calculează și salvează normal, dar NU trimite niciun email până îl scoateți manual din acest mod (secțiunea 15).</p>
+</form>
+{% endif %}
+{% endblock %}

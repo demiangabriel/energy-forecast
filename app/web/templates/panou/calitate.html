@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block titlu %}Calitatea datelor — {{ parc.nume }}{% endblock %}
+{% block continut %}
+<h1>Calitatea datelor măsurate</h1>
+<p class="subtitlu">{{ parc.nume }} ({{ parc.cod }}) — verifică automat istoricul de producție importat.
+  Orele marcate aici NU intră în antrenarea modelului și sunt raportate separat la verificare:
+  ele descriu starea parcului (avarii, limitări, senzori blocați), nu calitatea prognozei.</p>
+
+{% if mesaj %}<div class="info">{{ mesaj }}</div>{% endif %}
+
+<div class="actiuni">
+  <form method="post" action="/parcuri/{{ parc.id }}/calitate/analizeaza">
+    <button class="buton" type="submit">Rulează analiza de calitate</button>
+  </form>
+  <a class="buton secundar" href="/parcuri/{{ parc.id }}/import">Import date istorice</a>
+  <a class="buton secundar" href="/parcuri/{{ parc.id }}">&larr; Înapoi la parc</a>
+</div>
+
+{% if not rezumat.total_ore %}
+<div class="card">
+  <p>Nu există încă producție reală importată pentru acest parc.
+     Controlul de calitate lucrează pe istoricul măsurat — importați-l întâi (secțiunea 11).</p>
+</div>
+{% else %}
+
+<div class="grid grid-4">
+  <div class="card kpi"><span class="val">{{ rezumat.total_ore }}</span><span class="eticheta">ore de producție importate</span></div>
+  <div class="card kpi"><span class="val">{{ rezumat.ore_marcate }}</span><span class="eticheta">ore marcate ca problematice</span></div>
+  <div class="card kpi"><span class="val">{{ rezumat.procent_curat if rezumat.procent_curat is not none else '—' }}%</span><span class="eticheta">date curate</span></div>
+  <div class="card kpi"><span class="val">{{ rezumat.pe_steag | length }}</span><span class="eticheta">tipuri de probleme</span></div>
+</div>
+
+{% if rezumat.pe_steag %}
+<h2>Ce s-a găsit</h2>
+<div class="card">
+  <table>
+    <tr><th>Tip</th><th>Ore</th><th>Ce înseamnă și ce efect are</th></tr>
+    {% for steag, numar in rezumat.pe_steag.items() %}
+    <tr>
+      <td><strong>{{ etichete.get(steag, steag) }}</strong></td>
+      <td>{{ numar }}</td>
+      <td class="text-mic">{{ explicatii.get(steag, '') }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<h2>Ore marcate (primele {{ rezumat.exemple | length }})</h2>
+<div class="card" style="max-height:420px;overflow:auto">
+  <table>
+    <tr><th>Oră locală ({{ parc.fus_orar }})</th><th>Tip</th><th>Detaliu</th></tr>
+    {% for v in rezumat.exemple %}
+    <tr>
+      <td>{{ v.timestamp_utc | local(parc.fus_orar) }}</td>
+      <td>{{ etichete.get(v.steag, v.steag) }}</td>
+      <td class="text-mic">{{ v.detaliu or '' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% else %}
+<div class="succes">Nicio problemă detectată în istoricul importat. Toate orele sunt folosite la antrenare.</div>
+{% endif %}
+{% endif %}
+
+<h2>Ce verifică analiza</h2>
+<div class="card">
+  <ul class="lista-simpla">
+    <li><strong>Decalaj de fus orar</strong> — compară forma zilnică a producției cu poziția reală a
+      soarelui. Un fișier exportat în altă convenție de timp produce un decalaj constant de 1-3 ore,
+      care nu se vede în niciun indicator agregat, dar strică sistematic și calibrarea, și modelul.</li>
+    <li><strong>Producție raportată noaptea</strong> — imposibilă fizic la fotovoltaic; semn de decalaj
+      de contorizare sau de semn inversat.</li>
+    <li><strong>Valori blocate</strong> — aceeași valoare multe ore la rând: senzor sau legătură de
+      date înghețată.</li>
+    <li><strong>Indisponibilitate</strong> — producție mult sub ce permitea vremea, susținut în timp.</li>
+    <li><strong>Limitare de putere</strong> — platou neobișnuit de plat, sub așteptarea fizică.</li>
+    <li><strong>Valori extreme</strong> — puncte izolate, foarte diferite de vecinătatea lor.</li>
+    <li><strong>Peste puterea instalată</strong> — imposibil fizic; de obicei o eroare de unitate.</li>
+  </ul>
+</div>
+{% endblock %}

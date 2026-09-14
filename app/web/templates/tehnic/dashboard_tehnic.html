@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block titlu %}Modul tehnic{% endblock %}
+{% block continut %}
+<h1>Modul tehnic</h1>
+<p class="subtitlu">Control complet, fără restricții, pe orice câmp din orice model de date (R-305).</p>
+
+<div class="actiuni">
+  <a class="buton secundar" href="/tehnic/setari">Setări de operare</a>
+  <a class="buton secundar" href="/tehnic/jurnal">Jurnal rulări &amp; emailuri</a>
+  <a class="buton secundar" href="/tehnic/documentatie">Documentație</a>
+  <a class="buton secundar" href="/tehnic/cod-sursa">Cod sursă &amp; arhitectură</a>
+  <a class="buton secundar" href="/tehnic/rezerva">Copie de rezervă &amp; restaurare</a>
+  <a class="buton secundar" href="/tehnic/intretinere">Întreținere &amp; retenție</a>
+</div>
+
+<h2>Parcuri — configurație completă</h2>
+<div class="card">
+  <table>
+    <tr><th>Cod</th><th>Nume</th><th>Tehnologie</th><th>Activ</th><th>Mod umbră</th><th></th></tr>
+    {% for p in parcuri %}
+    <tr>
+      <td>{{ p.cod }}</td><td>{{ p.nume }}</td>
+      <td>{{ 'Fotovoltaic' if p.tehnologie.value == 'fotovoltaic' else 'Eolian' }}</td>
+      <td>{{ 'da' if p.activ else 'NU' }}</td>
+      <td>{{ 'da' if p.mod_umbra else 'nu' }}</td>
+      <td><a href="/tehnic/parcuri/{{ p.id }}">Configurează</a> · <a href="/parcuri/{{ p.id }}">Panou</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

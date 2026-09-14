@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block titlu %}Cod sursă &amp; arhitectură{% endblock %}
+{% block continut %}
+<h1>Cod sursă &amp; arhitectură</h1>
+<p class="subtitlu">Fără cadre care ascund logica de business: fiecare pas al calculului e cod Python simplu, citibil, editabil direct în fișierele de mai jos — nimic „magic", nicio abstractizare ascunsă (R-307, R-1403).</p>
+
+<div class="card">
+<h2>Cum se leagă piesele</h2>
+<p class="text-mic">HTTP (FastAPI, rutare subțire) → logică de business (<code>app/core/</code>, funcții simple) → persistență printr-o interfață unică (<code>Repository</code>) → SQLite azi, Firestore mâine, fără nicio schimbare în <code>app/core/</code>.</p>
+<p class="text-mic" style="margin-bottom:0">Documentele detaliate sunt în folderul <code>docs/</code> al proiectului:
+<code>MODELE.md</code> (toate modelele matematice, cu formule și referințe),
+<code>DEBUGGING.md</code> (auditul complet și fiecare problemă găsită),
+<code>SINTEZA-CERCETARE.md</code> (ce am comparat și ce am adoptat),
+<code>cercetare/</code> (rapoartele integrale de cercetare).</p>
+</div>
+
+<div class="card" style="margin-top:16px">
+<h2>app/ — nucleu</h2>
+<table>
+<tr><th>Fișier</th><th>Rol</th></tr>
+<tr><td><code>models.py</code></td><td>Toate structurile de date (Parc, ConfigPV, ConfigEolian, Rulare, OraPrognoza etc.) — simple dataclass-uri Python, fără ORM.</td></tr>
+<tr><td><code>config.py</code></td><td>Citirea <code>.env</code> (SMTP, backend de stocare, chei surse meteo).</td></tr>
+<tr><td><code>setari.py</code></td><td>Pragurile de operare editabile din UI (Modul tehnic → Setări), cu valori implicite documentate.</td></tr>
+<tr><td><code>main.py</code></td><td>Punctul de intrare FastAPI — montează cele două seturi de rute și paginile statice.</td></tr>
+</table>
+</div>
+
+<div class="card" style="margin-top:16px">
+<h2>app/core/ — logica de business (secțiunile 4-13 din specificație)</h2>
+<table>
+<tr><th>Fișier</th><th>Rol</th></tr>
+<tr><td><code>solar_position.py</code></td><td>Poziția solară la mijlocul intervalului orar (R-512).</td></tr>
+<tr><td><code>pv_model.py</code></td><td>Fizica fotovoltaică completă: transpunere POA, umbrire orizont, IAM, temperatură celulă, curbă DC→AC, pierderi multiplicative, degradare, limită de injecție — pe subansamblu, apoi însumat.</td></tr>
+<tr><td><code>wind_model.py</code></td><td>Extrapolarea vitezei vântului la înălțimea butucului (profil logaritmic), corecție de densitate, curbă de putere.</td></tr>
+<tr><td><code>weather_client.py</code></td><td>Interogarea Open-Meteo (prognoză live, arhivă „rulări anterioare", reanaliză ERA5) cu reîncercare exponențială; combinarea ansamblului de modele meteo.</td></tr>
+<tr><td><code>meteo_mapping.py</code></td><td>Singurul loc unde coloanele brute Open-Meteo sunt convertite în unitățile așteptate de motoarele fizice.</td></tr>
+<tr><td><code>weather_historical.py</code></td><td>Reconstrucția prognozei fizice istorice, pentru antrenarea modelului ML (R-610).</td></tr>
+<tr><td><code>istoric_productie.py</code></td><td>Citirea istoricului de producție reală importat, folosit atât de corectorul ML cât și de calibrare.</td></tr>
+<tr><td><code>ml_corrector.py</code></td><td>Construcția caracteristicilor (features), antrenarea LightGBM pe eroarea reziduală, logica de activare campion/provocator (R-605), împrumutul manual de corector între parcuri (R-620-623).</td></tr>
+<tr><td><code>calibration.py</code></td><td>Căutarea în grilă a înclinării/azimutului optim față de producția reală (secțiunea 7).</td></tr>
+<tr><td><code>sensitivity.py</code></td><td>Analiza de sensibilitate a parametrilor pe date meteo reale istorice (secțiunea 8).</td></tr>
+<tr><td><code>quality_gates.py</code></td><td>Cele 5 verificări de plauzibilitate care blochează sau avertizează asupra unei ore prognozate.</td></tr>
+<tr><td><code>csv_import.py</code></td><td>Validarea și importul istoricului de producție reală, inclusiv verificarea automată a fusului orar.</td></tr>
+<tr><td><code>email_report.py</code></td><td>Trimiterea raportului către client — cu toate verificările de siguranță (mod umbră, fără destinatari, rulare eșuată) evaluate înainte de orice trimitere efectivă.</td></tr>
+<tr><td><code>reports.py</code></td><td>Raportul lunar Excel, cu formule live, nu valori fixe (R-1202).</td></tr>
+<tr><td><code>excel_template.py</code></td><td>Șabloanele Excel pentru completarea datelor unui parc nou, cu comentarii explicative (R-407).</td></tr>
+<tr><td><code>forecast_engine.py</code></td><td>Orchestratorul unei singure rulări de prognoză, per parc — leagă vremea, fizica, corecția ML și verificările de calitate, în ordinea exactă cerută de specificație.</td></tr>
+<tr><td><code>daily_run.py</code></td><td>Orchestratorul rulării de portofoliu (toate parcurile active), cu izolare pe eroare per parc (R-1603).</td></tr>
+</table>
+</div>
+
+<div class="card" style="margin-top:16px">
+<h2>app/core/ — module adăugate în v2</h2>
+<table>
+<tr><th>Fișier</th><th>Rol</th></tr>
+<tr><td><code>clearsky.py</code></td><td>Referința de „cer senin”: baza indicelui de senin (scara naturală a producției fotovoltaice), a persistenței inteligente și a filtrului de ore utile.</td></tr>
+<tr><td><code>verification.py</code></td><td>Indicatori de acuratețe, prognoze de REFERINȚĂ și scor de skill; verificare probabilistică (pinball, CRPS, acoperire, ascuțime). Aici trăiește definiția a ceea ce înseamnă „bun”.</td></tr>
+<tr><td><code>data_quality.py</code></td><td>Algoritmii de control al calității producției măsurate (decalaj de timp, producție noaptea, valori blocate, indisponibilitate, limitare de putere, outlieri). Fără acces la baza de date — testabil direct pe serii.</td></tr>
+<tr><td><code>control_calitate.py</code></td><td>Legătura dintre algoritmii de mai sus și baza de date: citește, analizează, salvează verdictele.</td></tr>
+<tr><td><code>rezolutie.py</code></td><td>Trecerea de la pasul orar al modelelor meteo la pasul de 15 minute al decontării, prin interpolarea indicelui de senin.</td></tr>
+<tr><td><code>ponderi_adaptive.py</code></td><td>Ponderi de ansamblu deduse din performanța recentă a fiecărui model meteo pe parcul respectiv („meta-prognoza”).</td></tr>
+<tr><td><code>momente.py</code></td><td>Formatarea canonică a momentelor de timp — toate interogările pe interval compară text ISO, deci formatul trebuie să fie identic peste tot.</td></tr>
+</table>
+</div>
+
+<div class="card" style="margin-top:16px">
+<h2>app/storage/ — persistență, izolată de logica de business</h2>
+<table>
+<tr><th>Fișier</th><th>Rol</th></tr>
+<tr><td><code>repository.py</code></td><td>Interfața abstractă — singurul contract pe care <code>app/core/</code> îl cunoaște.</td></tr>
+<tr><td><code>sqlite_repo.py</code></td><td>Implementarea locală curentă.</td></tr>
+<tr><td><code>firestore_repo.py</code></td><td>Implementarea pentru migrarea viitoare — aceeași interfață, gata structural (necesită doar credențiale Google Cloud pentru activare).</td></tr>
+<tr><td><code>serialize.py</code></td><td>Conversii explicite obiect ↔ JSON, scrise de mână — fără reflecție „magică".</td></tr>
+<tr><td><code>db.py</code></td><td>Schema SQL.</td></tr>
+</table>
+<p class="text-mic">Migrarea la Firestore: se schimbă <code>STORAGE_BACKEND=firestore</code> în <code>.env</code> — nimic din <code>app/core/</code> sau din rute nu se modifică, pentru că totul depinde doar de interfața <code>Repository</code>.</p>
+</div>
+
+<div class="card" style="margin-top:16px">
+<h2>app/web/ — interfața HTTP (subțire, fără logică ascunsă)</h2>
+<table>
+<tr><th>Fișier</th><th>Rol</th></tr>
+<tr><td><code>routes_panou.py</code></td><td>Rutele zonei prietenoase.</td></tr>
+<tr><td><code>routes_tehnic.py</code></td><td>Rutele Modulului tehnic.</td></tr>
+<tr><td><code>validare.py</code></td><td>Verificări de plauzibilitate la salvarea configurației unui parc.</td></tr>
+<tr><td><code>vizualizare.py</code></td><td>Calculul stării afișate a unui parc (livrat/abatere/mod umbră/etc.) și al indicatorilor, prin modulul de verificare.</td></tr>
+<tr><td><code>deps.py</code></td><td>Instanța de template-uri și accesul la repository.</td></tr>
+<tr><td><code>templates/</code></td><td>HTML server-randat cu Jinja2 — fiecare pagină e un fișier <code>.html</code> lizibil, fără build step.</td></tr>
+</table>
+</div>
+
+<div class="card" style="margin-top:16px">
+<h2>scripts/ — rulare automată zilnică (R-901-905)</h2>
+<table>
+<tr><th>Fișier</th><th>Rol</th></tr>
+<tr><td><code>run_daily.py</code></td><td>Punctul de intrare CLI pentru rularea de portofoliu, cu trimitere de email.</td></tr>
+<tr><td><code>verifica_ora_si_ruleaza.py</code></td><td>Ajustare pentru ora de vară/iarnă — GitHub Actions declanșează de două ori pe zi (UTC fix), scriptul verifică ora locală și rulează doar dacă se potrivește cu ora configurată.</td></tr>
+</table>
+<p class="text-mic">Inactiv până la migrarea pe un server permanent — pregătit, dar nu necesar cât aplicația rulează local (R-1601, R-1602).</p>
+</div>
+
+<p style="margin-top:16px"><a href="/tehnic">&larr; Modul tehnic</a></p>
+{% endblock %}

@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block titlu %}Reală vs. prognoză (meteo) — {{ parc.nume }}{% endblock %}
+{% block continut %}
+<h1>Reală vs. prognoză — date meteo</h1>
+<p class="subtitlu">{{ parc.nume }} ({{ parc.cod }}) — GHI, temperatură și viteza vântului din prognoza
+  cea mai recentă emisă pentru fiecare oră, alături de vremea REALĂ (reanaliză ERA5 — cea mai bună
+  reconstrucție disponibilă a ce s-a întâmplat efectiv, R-701). Diferit de „Reală vs. prognoză"
+  (producție): aici se vede dacă eroarea vine chiar din prognoza meteo primită, înainte de modelul
+  fizic sau de corecția ML.</p>
+
+<div class="actiuni">
+  {% for z in [7, 14, 30, 90] %}
+  <a class="buton {{ '' if (z == zile and not interval_manual) else 'secundar' }}" href="/parcuri/{{ parc.id }}/comparatie-meteo?zile={{ z }}">Ultimele {{ z }} zile</a>
+  {% endfor %}
+  <a class="buton secundar" href="/parcuri/{{ parc.id }}">&larr; Înapoi la parc</a>
+</div>
+
+<div class="card" style="max-width:480px;margin-bottom:16px">
+  <form class="form-simplu" method="get" action="/parcuri/{{ parc.id }}/comparatie-meteo" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+    <div class="camp"><label>De la</label><input type="date" name="inceput" value="{{ date.inceput_data }}" required></div>
+    <div class="camp"><label>Până la</label><input type="date" name="sfarsit" value="{{ date.sfarsit_data }}" required></div>
+    <button class="buton {{ 'secundar' if not interval_manual else '' }}" type="submit">Interval ales</button>
+  </form>
+  <p class="text-mic" style="margin:8px 0 0">Reanaliza ERA5 pentru zile din trecut e reținută în cache după
+    prima cerere — o revizitare a aceleiași perioade nu mai interoghează rețeaua.</p>
+</div>
+
+{% if date.get('eroare') %}
+<div class="eroare">Nu s-a putut obține reanaliza meteo (rețea/serviciu indisponibil): {{ date.eroare }}</div>
+{% elif not date.are_date %}
+<div class="card">
+  <p>Nu există încă prognoze salvate pentru acest interval — rulați prognoza cel puțin o dată.</p>
+</div>
+{% else %}
+
+<div class="grid grid-3" style="margin:16px 0">
+  <div class="card kpi"><span class="val">{{ '%.0f'|format(date.mae_ghi) if date.mae_ghi is not none else '—' }}</span><span class="eticheta">MAE GHI (W/m²)</span></div>
+  <div class="card kpi"><span class="val">{{ '%.1f'|format(date.mae_temp) if date.mae_temp is not none else '—' }}</span><span class="eticheta">MAE temperatură (°C)</span></div>
+  <div class="card kpi"><span class="val">{{ '%.1f'|format(date.mae_vant) if date.mae_vant is not none else '—' }}</span><span class="eticheta">MAE viteză vânt (m/s)</span></div>
+</div>
+
+<div class="card">
+  <canvas id="graficComparatieMeteo" height="90"></canvas>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <table>
+    <tr><th>Oră ({{ parc.fus_orar }})</th><th>GHI real</th><th>GHI prognozat</th><th>Temp. reală</th><th>Temp. prognozată</th><th>Vânt real</th><th>Vânt prognozat</th></tr>
+    {% for r in date.randuri[:500] %}
+    <tr>
+      <td>{{ r.timestamp }}</td>
+      <td>{{ '%.0f'|format(r.ghi_real) if r.ghi_real is not none else '—' }}</td>
+      <td>{{ '%.0f'|format(r.ghi_prognozat) if r.ghi_prognozat is not none else '—' }}</td>
+      <td>{{ '%.1f'|format(r.temp_real) if r.temp_real is not none else '—' }}</td>
+      <td>{{ '%.1f'|format(r.temp_prognozat) if r.temp_prognozat is not none else '—' }}</td>
+      <td>{{ '%.1f'|format(r.vant_real) if r.vant_real is not none else '—' }}</td>
+      <td>{{ '%.1f'|format(r.vant_prognozat) if r.vant_prognozat is not none else '—' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% if date.randuri | length > 500 %}
+  <p class="text-mic">Se afișează cele mai recente 500 de ore din {{ date.randuri | length }} — graficul de mai sus acoperă toată perioada selectată.</p>
+  {% endif %}
+</div>
+{% endif %}
+
+<p><a href="/parcuri/{{ parc.id }}">&larr; Înapoi la parc</a></p>
+{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+{% endblock %}
+{% block script %}
+<script>
+const randuriMeteo = {{ (date.randuri | reverse | list) | tojson }};
+if (document.getElementById('graficComparatieMeteo') && randuriMeteo.length) {
+  new Chart(document.getElementById('graficComparatieMeteo'), {
+    type: 'line',
+    data: {
+      labels: randuriMeteo.map(r => r.timestamp),
+      datasets: [
+        { label: 'GHI real (W/m²)', data: randuriMeteo.map(r => r.ghi_real), borderColor: '#1f6f50', borderWidth: 2, pointRadius: 0, tension: .2 },
+        { label: 'GHI prognozat (W/m²)', data: randuriMeteo.map(r => r.ghi_prognozat), borderColor: '#1a5fb4', borderDash: [4,3], pointRadius: 0, tension: .2 },
+      ]
+    },
+    options: { responsive: true, interaction: {mode: 'index', intersect: false},
+      scales: { y: { title: { display: true, text: 'W/m²' } } } }
+  });
+}
+</script>
+{% endblock %}

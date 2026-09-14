@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block titlu %}Reconstrucție istoric — {{ parc.nume }}{% endblock %}
+{% block continut %}
+<h1>Reconstrucția istoricului de prognoze</h1>
+<p class="subtitlu">{{ parc.nume }} ({{ parc.cod }}) — recalculează ce ar fi prognozat modelul FIZIC pentru o perioadă trecută, folosind arhiva meteo de „rulări precedente" (secțiunea 6.2, R-610-612). Nu atinge producția reală importată.</p>
+
+<div class="card" style="max-width:520px">
+  <form class="form-simplu" method="post" action="/parcuri/{{ parc.id }}/reconstructie">
+    <div class="camp"><label>Început</label><input type="date" name="inceput" required></div>
+    <div class="camp"><label>Sfârșit</label><input type="date" name="sfarsit" required></div>
+    <button class="buton" type="submit">Reconstruiește</button>
+  </form>
+</div>
+
+{% if rezultat %}
+<div class="grid grid-4" style="margin:16px 0">
+  <div class="card kpi"><span class="val">{{ rezultat.numar_ore }}</span><span class="eticheta">ore reconstruite</span></div>
+  <div class="card kpi"><span class="val">{{ rezultat.energie_totala_kwh | mw }}</span><span class="eticheta">MWh total (fizic)</span></div>
+  <div class="card kpi"><span class="val">{{ rezultat.varf_kw | mw }}</span><span class="eticheta">vârf (MW)</span></div>
+</div>
+{% endif %}
+
+<p><a href="/parcuri/{{ parc.id }}">&larr; Înapoi la parc</a></p>
+{% endblock %}

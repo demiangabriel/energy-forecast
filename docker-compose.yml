@@ -1,0 +1,24 @@
+# Pornire pe un server permanent (faza 2, secțiunea 16 / R-1602) — un
+# singur serviciu, fără alte dependențe de infrastructură (nicio bază de
+# date separată de configurat: SQLite local sau Firestore extern, ales prin
+# STORAGE_BACKEND în .env).
+#
+# Rulare: docker compose up -d --build
+# Aplicația va fi disponibilă pe http://<server>:8000
+services:
+  prognoza:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      # necesar DOAR dacă STORAGE_BACKEND=sqlite (păstrează baza de date
+      # între repornirile containerului); ignorat, dar inofensiv, pentru
+      # STORAGE_BACKEND=firestore.
+      - ./data:/app/data
+      # credențialele Google Cloud pentru Firestore, dacă GOOGLE_APPLICATION_CREDENTIALS
+      # din .env indică un fișier montat aici (calea din .env trebuie să
+      # corespundă căii de montare de mai jos).
+      - ./credentials:/app/credentials:ro
+    restart: unless-stopped

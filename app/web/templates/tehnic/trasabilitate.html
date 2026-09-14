@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block titlu %}Trasabilitate rulare{% endblock %}
+{% block continut %}
+<h1>Trasabilitate — {{ parc.nume }}</h1>
+<p class="subtitlu">Rulare {{ rulare.id }} · declanșată {{ rulare.declansata_la[:19].replace('T',' ') }} UTC · tip {{ rulare.tip }} · stare {{ rulare.stare }}</p>
+{% if rulare.mesaj %}<div class="info">{{ rulare.mesaj }}</div>{% endif %}
+
+<h2>Surse meteo interogate</h2>
+<div class="card">
+  <table><tr><th>Sursă</th><th>A răspuns</th></tr>
+  {% for sursa, raspuns in rulare.surse_meteo_raspuns.items() %}
+  <tr><td>{{ sursa }}</td><td>{{ 'da' if raspuns else 'NU' }}</td></tr>
+  {% endfor %}
+  </table>
+</div>
+
+{% if parc.tehnologie.value == 'fotovoltaic' and parc.config_pv %}
+<h2>Configurație aplicată (pierderi, compunere multiplicativă)</h2>
+<div class="card text-mic">
+  Randament invertor: {{ parc.config_pv.randament_invertor }} ·
+  Murdărire: {{ parc.config_pv.pierdere_murdarire_pct }}% ·
+  Neuniformitate: {{ parc.config_pv.pierdere_neuniformitate_pct }}% ·
+  Cablaj/conexiuni: {{ parc.config_pv.pierdere_cablaj_conexiuni_pct }}% ·
+  LID: {{ parc.config_pv.pierdere_lid_pct }}% ·
+  Plăcuță: {{ parc.config_pv.pierdere_placuta_pct }}% ·
+  Indisponibilitate: {{ parc.config_pv.pierdere_indisponibilitate_pct }}% ·
+  Degradare anuală: {{ parc.config_pv.degradare_anuala_pct }}%/an ·
+  Umbrire orizont: {{ parc.config_pv.umbrire_orizont_grade }}° ({{ parc.config_pv.umbrire_orizont_directie.value }})
+</div>
+{% endif %}
+
+<h2>Lanțul complet de calcul, oră cu oră</h2>
+<div class="card" style="overflow-x:auto">
+<table>
+<tr>
+  <th>Oră (UTC)</th><th>GHI</th><th>DNI</th><th>Temp °C</th><th>Vânt m/s</th><th>Dispersie</th>
+  <th>P. DC (kW)</th><th>P. AC fizic (kW)</th><th>Fracție înc.</th>
+  <th>Corecție ML (kW)</th><th>Model</th><th>P. finală (kW)</th><th>Avertismente</th>
+</tr>
+{% for o in rulare.ore %}
+<tr {{ 'class="rand-blocat"' if o.blocat else '' }}>
+  <td>{{ o.timestamp_utc[:16].replace('T',' ') }}</td>
+  <td>{{ '%.0f'|format(o.ghi_wm2) if o.ghi_wm2 is not none else '—' }}</td>
+  <td>{{ '%.0f'|format(o.dni_wm2) if o.dni_wm2 is not none else '—' }}</td>
+  <td>{{ '%.1f'|format(o.temp_aer_c) if o.temp_aer_c is not none else '—' }}</td>
+  <td>{{ '%.1f'|format(o.viteza_vant_ms) if o.viteza_vant_ms is not none else '—' }}</td>
+  <td>{{ '%.1f'|format(o.dispersie_meteo) if o.dispersie_meteo is not none else '—' }}</td>
+  <td>{{ '%.0f'|format(o.putere_dc_kw) if o.putere_dc_kw is not none else '—' }}</td>
+  <td>{{ '%.0f'|format(o.putere_ac_fizic_kw) if o.putere_ac_fizic_kw is not none else '—' }}</td>
+  <td>{{ '%.2f'|format(o.fractie_incarcare) if o.fractie_incarcare is not none else '—' }}</td>
+  <td>{{ '%.0f'|format(o.corectie_ml_kw) if o.corectie_ml_kw is not none else '—' }}</td>
+  <td>{{ o.model_folosit or 'fizică pură' }}</td>
+  <td><strong>{{ '%.0f'|format(o.putere_finala_kw) if o.putere_finala_kw is not none else 'BLOCAT' }}</strong></td>
+  <td class="text-mic">{{ o.avertismente | join('; ') }}</td>
+</tr>
+{% endfor %}
+</table>
+</div>
+<p><a href="/parcuri/{{ parc.id }}">&larr; Înapoi la parc</a></p>
+{% endblock %}

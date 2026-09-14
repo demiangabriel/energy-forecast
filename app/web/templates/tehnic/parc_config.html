@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+{% block titlu %}Configurare — {{ parc.nume }}{% endblock %}
+{% block continut %}
+<h1>Configurare completă — {{ parc.nume }}</h1>
+<p class="subtitlu">Control complet, fără restricții, pe orice câmp (R-305). Codul propriu-zis rămâne editabil direct în fișierele din <code>app/</code> — vezi <a href="/tehnic/cod-sursa">Cod sursă &amp; arhitectură</a>.</p>
+{% if eroare %}<div class="eroare">{{ eroare }}</div>{% endif %}
+{% if request.query_params.get('salvat') %}<div class="succes">Salvat.</div>{% endif %}
+{% if request.query_params.get('mesaj') %}<div class="info">{{ request.query_params.get('mesaj') }}</div>{% endif %}
+
+<form class="form-simplu" method="post" action="/tehnic/parcuri/{{ parc.id }}" style="max-width:760px">
+
+  <fieldset>
+    <legend>Identificare &amp; stare</legend>
+    <div class="camp"><label>Cod</label><input name="cod" value="{{ parc.cod }}"></div>
+    <div class="camp"><label>Nume</label><input name="nume" value="{{ parc.nume }}"></div>
+    <div class="camp"><label>Client</label>
+      <select name="client_id">
+        {% for c in clienti %}<option value="{{ c.id }}" {{ 'selected' if c.id == parc.client_id else '' }}>{{ c.nume }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="camp"><label><input type="checkbox" name="activ" {{ 'checked' if parc.activ else '' }}> Activ (procesat la rulările de portofoliu)</label></div>
+    <div class="camp"><label><input type="checkbox" name="mod_umbra" {{ 'checked' if parc.mod_umbra else '' }}> Mod umbră (nu trimite email, R-1006)</label></div>
+    <div class="camp"><label>Destinatari email (separați prin virgulă)</label><input name="destinatari_text" value="{{ destinatari_text }}"></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Locație</legend>
+    <div class="camp"><label>Latitudine</label><input name="latitudine" value="{{ parc.latitudine }}"></div>
+    <div class="camp"><label>Longitudine</label><input name="longitudine" value="{{ parc.longitudine }}"></div>
+    <div class="camp"><label>Altitudine (m)</label><input name="altitudine_m" value="{{ parc.altitudine_m }}"></div>
+    <div class="camp"><label>Fus orar (prognoze)</label>
+      <select name="fus_orar">
+        {% set valori_listate = fusuri | map(attribute=0) | list %}
+        {% if parc.fus_orar not in valori_listate %}
+        <option value="{{ parc.fus_orar }}" selected>{{ parc.fus_orar }} (curent, nelistat)</option>
+        {% endif %}
+        {% for valoare, eticheta in fusuri %}
+        <option value="{{ valoare }}" {{ 'selected' if parc.fus_orar == valoare else '' }}>{{ eticheta }}</option>
+        {% endfor %}
+      </select>
+      <div class="explicatie">Guvernează prognoza: unde cade granița „ziua curentă e exclusă, se arată
+        doar zilele viitoare" (R-901/906) și ora afișată în grafic/tabel pe pagina parcului. Gestionează
+        corect ora de vară/iarnă (R-1502) — nu introduceți un offset fix. Folosit și la interpretarea
+        CSV-ului importat (R-511) DOAR dacă „Fus orar IMPORT" de mai jos e gol — altfel acesta din urmă
+        are prioritate la import. Zonă tehnică, fără restricții (R-305): acceptă orice fus orar IANA
+        valid, chiar dacă nu e în listă — tastați-l direct în acest câmp, în orice editor de formular.</div>
+    </div>
+    <div class="camp"><label>Fus orar IMPORT (opțional — gol = identic cu cel de mai sus)</label>
+      <select name="fus_orar_import">
+        <option value="" {{ 'selected' if not parc.fus_orar_import else '' }}>-- identic cu fusul de mai sus --</option>
+        {% set valori_listate_import = fusuri | map(attribute=0) | list %}
+        {% if parc.fus_orar_import and parc.fus_orar_import not in valori_listate_import %}
+        <option value="{{ parc.fus_orar_import }}" selected>{{ parc.fus_orar_import }} (curent, nelistat)</option>
+        {% endif %}
+        {% for valoare, eticheta in fusuri %}
+        <option value="{{ valoare }}" {{ 'selected' if parc.fus_orar_import == valoare else '' }}>{{ eticheta }}</option>
+        {% endfor %}
+      </select>
+      <div class="explicatie">R-511/R-xxx: folosit STRICT la interpretarea orelor locale dintr-un CSV
+        importat (secțiunea 11) — fusul de mai sus rămâne cel care guvernează prognozele/afișarea.
+        Motiv tipic: exportul din SCADA/contor folosește o convenție orară fixă (fără oră de vară/iarnă),
+        diferită de fusul IANA ales pentru prognoze. Din v8 formatul de bază cere decalaj explicit în
+        fișier, caz în care acest câmp nu mai poate influența importul.</div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Surse meteo (R-501, R-503 — module înlocuibile)</legend>
+    <div class="camp"><label>Modele (id-uri Open-Meteo, separate prin virgulă)</label>
+      <div class="explicatie">ex: ecmwf_ifs025, gfs_seamless, icon_seamless</div>
+      <input name="surse_text" value="{{ surse_text }}"></div>
+    <div class="camp"><label>Ponderi (opțional — gol = pondere egală)</label>
+      <div class="explicatie">Un rând per model: <code>id_model;pondere</code></div>
+      <textarea name="ponderi_text" rows="3">{{ ponderi_text }}</textarea></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Livrare &amp; incertitudine</legend>
+    <div class="camp"><label>Rezoluție de livrare</label>
+      <div class="explicatie">Piața din România decontează la 15 minute (SDAC a trecut la MTU de 15 min
+        din 10/2025). Modelele meteo dau date orare; la 15 min se interpolează prin indicele de senin,
+        nu pe valorile brute de radiație.</div>
+      <select name="rezolutie_minute">
+        <option value="60" {{ 'selected' if parc.rezolutie_minute == 60 else '' }}>60 de minute (orar)</option>
+        <option value="15" {{ 'selected' if parc.rezolutie_minute == 15 else '' }}>15 minute (sfert de oră)</option>
+      </select>
+    </div>
+    <div class="camp"><label><input type="checkbox" name="produce_cuantile" {{ 'checked' if parc.produce_cuantile else '' }}> Produce benzi de incertitudine (P10/P50/P90)</label>
+      <div class="explicatie">Necesită un model antrenat; benzile se calibrează conform pe date nevăzute.</div></div>
+    <div class="camp"><label><input type="checkbox" name="ponderi_automate" {{ 'checked' if parc.ponderi_automate else '' }}> Ponderi de ansamblu automate (meta-prognoză)</label>
+      <div class="explicatie">Deduce ponderile modelelor meteo din performanța lor recentă pe ACEST parc.
+        Dacă e bifat, ponderile manuale de mai sus sunt ignorate când există destule date.</div></div>
+    <div class="camp"><label>Putere de referință pentru indicatori (kW, opțional)</label>
+      <div class="explicatie">Baza de normalizare a nMAE/nRMSE. Gol = puterea instalată. Completați doar
+        dacă indicatorii trebuie raportați la puterea contractată/de racordare.</div>
+      <input name="putere_referinta_kw" value="{{ parc.putere_referinta_kw or '' }}"></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Corector ML împrumutat (R-620-623)</legend>
+    <div class="camp"><label>Parc-sursă (gol = fără împrumut)</label>
+      <select name="parc_imprumut_corector_id">
+        <option value="">-- niciunul --</option>
+        {% for p in alte_parcuri %}<option value="{{ p.id }}" {{ 'selected' if p.id == parc.parc_imprumut_corector_id else '' }}>{{ p.cod }} — {{ p.nume }}</option>{% endfor %}
+      </select>
+      <div class="explicatie">Se folosește DOAR dacă acest parc nu are propriul model activ. Alegere strict manuală (R-620).</div>
+    </div>
+  </fieldset>
+
+  {% if parc.tehnologie.value == 'fotovoltaic' %}
+  <fieldset>
+    <legend>Configurație fotovoltaică</legend>
+    {% if parc.config_pv.subansambluri | length == 1 %}
+    <div class="camp"><label>Înclinare (grade)</label>
+      <input name="inclinare_grade" value="{{ parc.config_pv.subansambluri[0].inclinare_grade if parc.config_pv.subansambluri[0].inclinare_grade is not none else '' }}"></div>
+    <div class="camp"><label>Azimut (grade, 180 = sud)</label>
+      <input name="azimut_grade" value="{{ parc.config_pv.subansambluri[0].azimut_grade if parc.config_pv.subansambluri[0].azimut_grade is not none else '' }}"></div>
+    <div class="explicatie" style="margin:-8px 0 12px">Editare rapidă — actualizează direct singura orientare a
+      acestui parc (subansamblul „{{ parc.config_pv.subansambluri[0].nume }}” de mai jos). Acceptă și virgulă
+      zecimală (30,5). Pentru mai multe orientări (est-vest, mai multe acoperișuri), adăugați rânduri în
+      „Subansambluri” mai jos — câmpurile de aici dispar automat când sunt mai multe.</div>
+    {% endif %}
+    <div class="camp"><label>Putere DC totală (kWp)</label><input name="putere_dc_kwp" value="{{ parc.config_pv.putere_dc_kwp }}"></div>
+    <div class="camp"><label>Putere AC / invertor (kW)</label><input name="putere_ac_kw" value="{{ parc.config_pv.putere_ac_kw }}"></div>
+    <div class="camp"><label>Randament invertor (0-1)</label><input name="randament_invertor" value="{{ parc.config_pv.randament_invertor }}"></div>
+    <div class="camp"><label>Limită de injecție (kW, opțional)</label><input name="limita_injectie_kw" value="{{ parc.config_pv.limita_injectie_kw or '' }}"></div>
+    <div class="camp"><label>Tehnologie panou</label>
+      <select name="tehnologie_panou">
+        {% for t in ['monocrystalline','polycrystalline','PERC_TOPCon_HJT','thin_film','bifacial'] %}
+        <option value="{{ t }}" {{ 'selected' if parc.config_pv.tehnologie_panou.value == t else '' }}>{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="camp"><label>Coeficient temperatură (%/°C, opțional)</label><input name="coeficient_temperatura_pct_per_c" value="{{ parc.config_pv.coeficient_temperatura_pct_per_c or '' }}"></div>
+    <div class="camp"><label>Model termic montaj</label>
+      <select name="model_termic_montaj">
+        <option value="open_rack_glass_glass" {{ 'selected' if parc.config_pv.model_termic_montaj.value == 'open_rack_glass_glass' else '' }}>structură deschisă, sticlă-sticlă</option>
+        <option value="open_rack_glass_polymer" {{ 'selected' if parc.config_pv.model_termic_montaj.value == 'open_rack_glass_polymer' else '' }}>structură deschisă, sticlă-polimer</option>
+        <option value="insulated_back_glass_polymer" {{ 'selected' if parc.config_pv.model_termic_montaj.value == 'insulated_back_glass_polymer' else '' }}>montaj apropiat de acoperiș</option>
+      </select>
+    </div>
+    <div class="camp"><label>Degradare anuală (%/an)</label><input name="degradare_anuala_pct" value="{{ parc.config_pv.degradare_anuala_pct }}"></div>
+    <div class="camp"><label>Data punerii în funcțiune (AAAA-LL-ZZ, opțional)</label><input name="data_punerii_in_functiune" value="{{ parc.config_pv.data_punerii_in_functiune or '' }}"></div>
+    <div class="camp"><label>Pierdere murdărire (%)</label><input name="pierdere_murdarire_pct" value="{{ parc.config_pv.pierdere_murdarire_pct }}"></div>
+    <div class="camp"><label>Pierdere neuniformitate (%)</label><input name="pierdere_neuniformitate_pct" value="{{ parc.config_pv.pierdere_neuniformitate_pct }}"></div>
+    <div class="camp"><label>Pierdere cablaj/conexiuni (%)</label><input name="pierdere_cablaj_conexiuni_pct" value="{{ parc.config_pv.pierdere_cablaj_conexiuni_pct }}"></div>
+    <div class="camp"><label>Pierdere LID (%)</label><input name="pierdere_lid_pct" value="{{ parc.config_pv.pierdere_lid_pct }}"></div>
+    <div class="camp"><label>Pierdere plăcuță (%)</label><input name="pierdere_placuta_pct" value="{{ parc.config_pv.pierdere_placuta_pct }}"></div>
+    <div class="camp"><label>Pierdere indisponibilitate (%)</label><input name="pierdere_indisponibilitate_pct" value="{{ parc.config_pv.pierdere_indisponibilitate_pct }}"></div>
+    <div class="camp"><label>Pierdere reziduală, nemodelată (%)</label>
+      <input name="pierdere_nemodelata_pct" value="{{ parc.config_pv.pierdere_nemodelata_pct }}">
+      <div class="explicatie">Partea pe care calibrarea o găsește dar nu o poate atribui unei cauze
+        fizice anume. Se completează de obicei din pagina de calibrare („Aplică și factorul de
+        scalare"), nu manual. 0 = nimic rezidual.</div></div>
+    <div class="camp"><label>Umbrire orizont (grade)</label><input name="umbrire_orizont_grade" value="{{ parc.config_pv.umbrire_orizont_grade }}"></div>
+    <div class="camp"><label>Umbrire orizont — direcție</label>
+      <select name="umbrire_orizont_directie">
+        {% for d in ['est','vest','ambele'] %}<option value="{{ d }}" {{ 'selected' if parc.config_pv.umbrire_orizont_directie.value == d else '' }}>{{ d }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="camp"><label>Subansambluri (orientări) — R-412</label>
+      <div class="explicatie">Un rând per subansamblu: <code>nume;putere_dc_kwp;inclinare_grade;azimut_grade;tip_asezare</code>
+        (tip_asezare: fixed/east_west/tracker). Acceptă și virgulă zecimală. Pentru UN SINGUR subansamblu,
+        câmpurile rapide „Înclinare”/„Azimut” de mai sus au prioritate la salvare — editați aici doar dacă
+        adăugați/ștergeți rânduri (mai multe orientări) sau schimbați numele/puterea/tipul.</div>
+      <textarea name="subansambluri_text" rows="4">{{ subansambluri_text }}</textarea>
+    </div>
+    <div class="camp"><label><input type="checkbox" name="clipping_per_subansamblu" {{ 'checked' if parc.config_pv.clipping_per_subansamblu else '' }}> Fiecare subansamblu are invertor/MPPT separat</label>
+      <div class="explicatie">Implicit NEBIFAT: toate subansamblurile împart același invertor, deci limitarea
+        se aplică pe SUMA puterilor DC (R-412 — altfel producția se supraestimează cu 4-6%). Bifați doar dacă
+        topologia reală are invertoare separate: atunci limitarea se aplică fiecărui subansamblu în parte.</div></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Modele fizice avansate (fotovoltaic)</legend>
+    <div class="camp"><label>Model de transpoziție a radiației</label>
+      <div class="explicatie">Cum se convertește radiația orizontală în radiație pe planul înclinat.
+        Perez (formularea continuă Driesse) e implicitul industriei; Hay-Davies era implicitul anterior
+        și nu are termenul de strălucire a orizontului.</div>
+      <select name="model_transpozitie">
+        {% for v, eticheta in [('perez-driesse','Perez-Driesse (recomandat)'), ('perez','Perez (1990)'),
+                                ('haydavies','Hay-Davies'), ('isotropic','izotrop (cel mai simplu)')] %}
+        <option value="{{ v }}" {{ 'selected' if parc.config_pv.model_transpozitie.value == v else '' }}>{{ eticheta }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="camp"><label>Albedo sol (0-1)</label>
+      <div class="explicatie">Reflexia solului. ~0,2 iarbă/pământ, ~0,1 asfalt.</div>
+      <input name="albedo" value="{{ parc.config_pv.albedo }}"></div>
+    <div class="camp"><label>Albedo cu strat de zăpadă (0-1)</label>
+      <div class="explicatie">Se folosește automat cât timp sursa meteo raportează strat de zăpadă.
+        Zăpada urcă reflexia la 0,6-0,8 și adaugă radiație reflectată pe module.</div>
+      <input name="albedo_zapada" value="{{ parc.config_pv.albedo_zapada }}"></div>
+    <div class="camp"><label><input type="checkbox" name="pierderi_zapada" {{ 'checked' if parc.config_pv.pierderi_zapada else '' }}> Modelează pierderile din acoperirea cu zăpadă</label>
+      <div class="explicatie">Model NREL/Marion: zăpada acoperă modulul la ninsoare și alunecă atunci când
+        radiația și înclinarea o permit. Fără el, zilele cu zăpadă produc erori de 50-100%.</div></div>
+    <div class="camp"><label>Model de temperatură a celulei</label>
+      <select name="model_temperatura">
+        <option value="sapm" {{ 'selected' if parc.config_pv.model_temperatura.value == 'sapm' else '' }}>SAPM (arhetipuri de montaj)</option>
+        <option value="faiman" {{ 'selected' if parc.config_pv.model_temperatura.value == 'faiman' else '' }}>Faiman (2 parametri, calibrabil)</option>
+      </select>
+      <div class="explicatie">Faiman e forma standard IEC 61853-2, cu doi coeficienți care pot fi ajustați
+        din producția reală a parcului.</div>
+    </div>
+    <div class="camp"><label>Faiman U0 (W/m²/K)</label><input name="faiman_u0" value="{{ parc.config_pv.faiman_u0 }}"></div>
+    <div class="camp"><label>Faiman U1 (W/m²/K/(m/s))</label><input name="faiman_u1" value="{{ parc.config_pv.faiman_u1 }}"></div>
+    <div class="camp"><label>Sursa DNI/DHI</label>
+      <div class="explicatie">DNI-ul întors direct de modelele meteo e în general câmpul radiativ cel mai
+        slab. Se poate re-deriva din GHI cu un model de separare — merită testat per parc, rezultatul
+        depinde de locație.</div>
+      <select name="mod_separare_radiatie">
+        {% for v, eticheta in [('nwp','direct din modelul meteo (implicit)'), ('erbs','Erbs'),
+                                ('dirint','DIRINT'), ('dirindex','DIRINDEX'), ('boland','Boland/BRL')] %}
+        <option value="{{ v }}" {{ 'selected' if parc.config_pv.mod_separare_radiatie.value == v else '' }}>{{ eticheta }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="camp"><label><input type="checkbox" name="soiling_dinamic" {{ 'checked' if parc.config_pv.soiling_dinamic else '' }}> Murdărire dinamică (model Kimber)</label>
+      <div class="explicatie">Acumulare pe zilele uscate, spălare la ploaie, în locul procentului fix de mai sus.
+        Necesită date de precipitații de la sursa meteo.</div></div>
+    <div class="camp"><label>Rată de acumulare a murdăriei (%/zi)</label><input name="soiling_rata_zi_pct" value="{{ parc.config_pv.soiling_rata_zi_pct }}"></div>
+    <div class="camp"><label>Prag de ploaie care spală panourile (mm)</label><input name="soiling_prag_ploaie_mm" value="{{ parc.config_pv.soiling_prag_ploaie_mm }}"></div>
+    <div class="camp"><label>Curbă de randament al invertorului (opțional)</label>
+      <div class="explicatie">Un rând per punct: <code>fractie_incarcare;randament</code> (ex. <code>0.1;0.94</code>).
+        Dacă e completată, înlocuiește randamentul constant — contează în orele de dimineață și seară,
+        unde randamentul real scade și modelul cu valoare fixă supraestimează.</div>
+      <textarea name="curba_randament_text" rows="4">{{ curba_randament_text }}</textarea>
+    </div>
+  </fieldset>
+  {% else %}
+  <fieldset>
+    <legend>Configurație eoliană</legend>
+    <div class="camp"><label>Număr turbine</label><input name="numar_turbine" value="{{ parc.config_eolian.numar_turbine }}"></div>
+    <div class="camp"><label>Putere nominală / turbină (kW)</label><input name="putere_nominala_kw" value="{{ parc.config_eolian.putere_nominala_kw }}"></div>
+    <div class="camp"><label>Înălțime butuc (m)</label><input name="inaltime_butuc_m" value="{{ parc.config_eolian.inaltime_butuc_m }}"></div>
+    <div class="camp"><label>Viteză pornire (m/s)</label><input name="viteza_pornire_ms" value="{{ parc.config_eolian.viteza_pornire_ms or '' }}"></div>
+    <div class="camp"><label>Viteză nominală (m/s)</label><input name="viteza_nominala_ms" value="{{ parc.config_eolian.viteza_nominala_ms or '' }}"></div>
+    <div class="camp"><label>Viteză oprire (m/s)</label><input name="viteza_oprire_ms" value="{{ parc.config_eolian.viteza_oprire_ms or '' }}"></div>
+    <div class="camp"><label>Pierdere siaj (%)</label><input name="pierdere_siaj_pct" value="{{ parc.config_eolian.pierdere_siaj_pct }}"></div>
+    <div class="camp"><label>Pierdere sistem (%)</label><input name="pierdere_sistem_pct" value="{{ parc.config_eolian.pierdere_sistem_pct }}"></div>
+    <div class="camp"><label>Curbă de putere exactă (opțional — R-422a)</label>
+      <div class="explicatie">Un rând per punct: <code>viteza_m_s;putere_kw</code>. Dacă e completată, are prioritate față de cele 3 viteze simple.</div>
+      <textarea name="curba_text" rows="6">{{ curba_text }}</textarea>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Modele fizice avansate (eolian)</legend>
+    <div class="camp"><label>Profil vertical al vântului</label>
+      <div class="explicatie">Legea puterii deduce exponentul α exact din perechea 10 m / 100 m și trece
+        prin ambele puncte măsurate. Profilul logaritmic rezolvă rugozitatea prin bisecție (comportamentul anterior).</div>
+      <select name="profil_vertical">
+        <option value="power_law" {{ 'selected' if parc.config_eolian.profil_vertical.value == 'power_law' else '' }}>legea puterii, exponent din 10/100 m (recomandat)</option>
+        <option value="log_law" {{ 'selected' if parc.config_eolian.profil_vertical.value == 'log_law' else '' }}>profil logaritmic (rugozitate)</option>
+      </select>
+    </div>
+    <div class="camp"><label>Tip de reglaj al turbinei</label>
+      <div class="explicatie">IEC 61400-12: la reglaj pitch (turbinele moderne) corecția de densitate se
+        aplică VITEZEI; la reglaj stall, PUTERII.</div>
+      <select name="reglaj">
+        <option value="pitch" {{ 'selected' if parc.config_eolian.reglaj.value == 'pitch' else '' }}>pitch (pas variabil)</option>
+        <option value="stall" {{ 'selected' if parc.config_eolian.reglaj.value == 'stall' else '' }}>stall (desprindere)</option>
+      </select>
+    </div>
+    <div class="camp"><label><input type="checkbox" name="netezire_turbulenta" {{ 'checked' if parc.config_eolian.netezire_turbulenta else '' }}> Netezește curba de putere cu intensitatea turbulenței</label>
+      <div class="explicatie">O curbă de putere aplicată pe MEDIA vitezei supraestimează lângă viteza de
+        pornire (curba e convexă) și subestimează lângă cea nominală (curba e concavă). Netezirea corectează
+        ambele efecte prin convoluție cu distribuția vitezelor din interval.</div></div>
+    <div class="camp"><label>Intensitatea turbulenței (0-1, opțional)</label>
+      <div class="explicatie">Gol = estimată din rugozitatea dedusă din date. Tipic 0,10-0,16 în câmp deschis.</div>
+      <input name="intensitate_turbulenta" value="{{ parc.config_eolian.intensitate_turbulenta or '' }}"></div>
+    <div class="camp"><label><input type="checkbox" name="wake_dependent_de_viteza" {{ 'checked' if parc.config_eolian.wake_dependent_de_viteza else '' }}> Pierdere de siaj dependentă de viteză</label>
+      <div class="explicatie">Siajul e maxim la sarcină parțială (coeficient de tracțiune mare) și dispare
+        practic peste viteza nominală. Procentul declarat mai sus devine valoarea MAXIMĂ, nu una constantă.</div></div>
+    <div class="camp"><label>Diametru rotor (m, opțional)</label><input name="diametru_rotor_m" value="{{ parc.config_eolian.diametru_rotor_m or '' }}"></div>
+  </fieldset>
+  {% endif %}
+
+  <div class="actiuni">
+    <button class="buton" type="submit">Salvează</button>
+    <a class="buton secundar" href="/tehnic/parcuri/{{ parc.id }}/senzitivitate">Analiză de sensibilitate</a>
+    <a class="buton secundar" href="/parcuri/{{ parc.id }}">Vezi în Panou</a>
+  </div>
+</form>
+
+<div class="card" style="margin-top:24px;max-width:640px">
+  <h3>Curățare producție importată dintr-un interval</h3>
+  <p class="text-mic">Pentru un import greșit (tipic: fus orar de import greșit pe o parte din istoric —
+    vedeți avertismentele de pe pagina de import). Șterge STRICT producția reală și verdictele de calitate
+    din intervalul ales — nu atinge configurația parcului, prognozele sau modelul ML antrenat. Necesar
+    ÎNAINTE de o reimportare curată: reimportarea e aditivă (upsert după timestamp UTC), deci fără această
+    curățare orele scrise inițial cu fusul greșit ar rămâne în bază ALĂTURI de cele corecte, nu ar fi
+    înlocuite (au timestamp-uri UTC diferite).</p>
+  <form method="post" action="/tehnic/parcuri/{{ parc.id }}/sterge-productie"
+        onsubmit="return confirm('Sigur ștergeți producția reală și verdictele de calitate din acest interval? Nu se poate anula (dar puteți reimporta după).')"
+        style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">
+    <div class="camp"><label>De la (dată locală, fus de import)</label><input type="date" name="inceput" required></div>
+    <div class="camp"><label>Până la (inclusiv)</label><input type="date" name="sfarsit" required></div>
+    <button class="buton pericol" type="submit">Șterge producția din interval</button>
+  </form>
+</div>
+
+<form method="post" action="/tehnic/parcuri/{{ parc.id }}/sterge" onsubmit="return confirm('Sigur ștergeți definitiv acest parc și toate datele lui?')" style="margin-top:24px">
+  <button class="buton pericol" type="submit">Șterge parcul definitiv</button>
+</form>
+{% endblock %}

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block titlu %}Platformă prognoză producție energie{% endblock %}</title>
+<link rel="stylesheet" href="/static/css/style.css">
+{% block head %}{% endblock %}
+</head>
+<body>
+<div class="antet">
+  <a href="/" class="brand"><span class="punct"></span> Prognoză producție energie</a>
+  <div class="nav-zone">
+    <a href="/" class="{{ 'activ' if zona == 'panou' else '' }}">Panou</a>
+    <a href="/tehnic" class="{{ 'activ' if zona == 'tehnic' else '' }}">Modul tehnic</a>
+  </div>
+</div>
+{% if zona == 'tehnic' %}
+<div class="zona-tehnica-banner">Sunteți în <strong>Modul tehnic</strong> — control complet, fără restricții, pe orice câmp. <a href="/" style="color:#fff;text-decoration:underline;">Înapoi la Panou</a></div>
+{% endif %}
+<div class="continut">
+{#
+  Buton „înapoi”, prezent pe orice pagină în afară de portofoliu (care E pagina
+  de pornire — n-ar avea unde să se întoarcă). Folosește istoricul browserului
+  ca să ducă exact la pagina de unde a venit operatorul: același ecran se
+  deschide din locuri diferite (portofoliu, detaliu parc, modul tehnic), deci
+  o destinație fixă ar trimite adesea greșit. Dacă pagina a fost deschisă
+  direct, fără istoric, linkul cade pe destinația firească — detaliul parcului
+  când există unul, altfel portofoliul.
+#}
+{% set cale = request.url.path %}
+{% if cale != '/' %}
+{% set retur = ('/parcuri/' ~ parc.id) if parc is defined and parc and '/parcuri/' ~ parc.id != cale
+                else ('/tehnic' if zona == 'tehnic' else '/') %}
+<a class="buton-inapoi" href="{{ retur }}"
+   onclick="if (history.length > 1) { history.back(); return false; }">
+  <span aria-hidden="true">&larr;</span> Înapoi
+</a>
+{% endif %}
+{% block continut %}{% endblock %}
+</div>
+{% block script %}{% endblock %}
+</body>
+</html>

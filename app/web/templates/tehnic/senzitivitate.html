@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block titlu %}Analiză de sensibilitate — {{ parc.nume }}{% endblock %}
+{% block continut %}
+<h1>Analiză de sensibilitate</h1>
+<p class="subtitlu">{{ parc.nume }} ({{ parc.cod }}) — pentru fiecare parametru configurabil, se aplică o treaptă fixă de variație și se rerulează motorul fizic pe un an întreg de vreme reală istorică (reanaliză ERA5), nu pe o estimare teoretică. Rezultatul arată unde merită precizie maximă la completarea datelor și unde o aproximare e suficientă (R-801-802).</p>
+
+{% if not rezultat %}
+<div class="card" style="max-width:560px">
+  <form method="post" action="/tehnic/parcuri/{{ parc.id }}/senzitivitate">
+    <button class="buton" type="submit">Rulează analiza de sensibilitate</button>
+  </form>
+  <p class="text-mic" style="margin-top:10px">Descarcă un an de date meteo reale (reanaliză) și rulează fizica de zeci de ori — poate dura până la câteva zeci de secunde.</p>
+</div>
+{% else %}
+<div class="card">
+  <p>Energie anuală de referință: <strong>{{ rezultat.energie_anuala_referinta_kwh | mw }} MWh</strong> · perioadă analizată: {{ rezultat.perioada }}</p>
+</div>
+
+<div class="card" style="margin-top:16px; overflow-x:auto">
+  <table>
+    <tr><th>Parametru (treaptă de variație)</th><th>Energie anuală bază (MWh)</th><th>Energie anuală modificată (MWh)</th><th>Variație</th></tr>
+    {% for r in rezultat.rezultate %}
+    <tr>
+      <td>{{ r.parametru }}</td>
+      <td>{{ r.energie_anuala_baza_kwh | mw }}</td>
+      <td>{{ r.energie_anuala_modificata_kwh | mw }}</td>
+      <td><strong>{{ '%+.2f'|format(r.variatie_pct) }}%</strong></td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+<p class="text-mic" style="margin-top:8px">Ordonat descrescător după impactul absolut asupra energiei anuale (R-802) — parametrii din capul listei sunt cei pentru care o valoare imprecisă afectează cel mai mult prognoza.</p>
+{% endif %}
+
+<p style="margin-top:16px"><a href="/tehnic/parcuri/{{ parc.id }}">&larr; Înapoi la configurare</a></p>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block titlu %}Jurnal{% endblock %}
+{% block continut %}
+<h1>Jurnal rulări &amp; emailuri</h1>
+<p class="subtitlu">Fiecare rulare și fiecare încercare de trimitere email, consultabile aici (R-1008, R-1510-1511).</p>
+
+<h2>Rulări</h2>
+<div class="card">
+  <table>
+    <tr><th>Parc</th><th>Declanșată la (UTC)</th><th>Tip</th><th>Stare</th><th>Mesaj</th><th></th></tr>
+    {% for r in rulari %}
+    <tr>
+      <td>{{ parcuri[r.parc_id].cod if r.parc_id in parcuri else r.parc_id }}</td>
+      <td>{{ r.declansata_la[:19].replace('T',' ') }}</td>
+      <td>{{ r.tip }}</td>
+      <td><span class="pastila {{ 'livrat' if r.stare == 'reusita' else ('abatere' if r.stare == 'partiala' else 'fara_date') }}">{{ r.stare }}</span></td>
+      <td class="text-mic">{{ r.mesaj or '' }}</td>
+      <td><a href="/tehnic/parcuri/{{ r.parc_id }}/trasabilitate/{{ r.id }}">detalii</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<h2>Încercări de trimitere email</h2>
+<div class="card">
+  <table>
+    <tr><th>Parc</th><th>Moment (UTC)</th><th>Către</th><th>Rezultat</th><th>Motiv</th></tr>
+    {% for i in incercari_email %}
+    <tr>
+      <td>{{ parcuri[i.parc_id].cod if i.parc_id in parcuri else i.parc_id }}</td>
+      <td>{{ i.moment[:19].replace('T',' ') }}</td>
+      <td class="text-mic">{{ i.catre | join(', ') }}</td>
+      <td><span class="pastila {{ 'livrat' if i.rezultat == 'reusit' else ('mod_umbra' if i.rezultat == 'sarit' else 'fara_date') }}">{{ i.rezultat }}</span></td>
+      <td class="text-mic">{{ i.motiv or '' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+<p><a href="/tehnic">&larr; Modul tehnic</a></p>
+{% endblock %}

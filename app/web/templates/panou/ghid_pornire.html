@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block titlu %}Ghid de pornire{% endblock %}
+{% block continut %}
+<h1>Ghid de pornire</h1>
+<p class="subtitlu">Pașii pentru un portofoliu nou (R-1305).</p>
+<div class="card">
+  <div class="pas-ghid {{ 'facut' if are_parcuri else '' }}">
+    <div class="bifa"></div>
+    <div><strong>1. Adăugați primul parc</strong><div class="text-mic">Alegeți tehnologia (fotovoltaic/eolian), completați câmpurile importante. Parcul pornește automat în „mod umbră" — nu trimite emailuri până îl scoateți manual.</div>
+      <a href="/parcuri/noua">Adaugă parc &rarr;</a></div>
+  </div>
+  <div class="pas-ghid">
+    <div class="bifa"></div>
+    <div><strong>2. Configurați client și destinatari email</strong><div class="text-mic">Din detaliul parcului sau din Modul tehnic.</div></div>
+  </div>
+  <div class="pas-ghid">
+    <div class="bifa"></div>
+    <div><strong>3. Importați istoricul de producție (opțional, dar recomandat)</strong><div class="text-mic">Formatul CSV strict din Anexa A — necesar pentru antrenarea corectorului ML și pentru calibrarea geometriei.</div></div>
+  </div>
+  <div class="pas-ghid">
+    <div class="bifa"></div>
+    <div><strong>4. Calibrați geometria (dacă nu știți exact înclinarea/azimutul)</strong><div class="text-mic">Doar pentru parcuri fotovoltaice cu o orientare fixă — secțiunea 7.</div></div>
+  </div>
+  <div class="pas-ghid">
+    <div class="bifa"></div>
+    <div><strong>5. Rulați prima prognoză</strong><div class="text-mic">Buton „Recalculează" din detaliul parcului.</div></div>
+  </div>
+  <div class="pas-ghid">
+    <div class="bifa"></div>
+    <div><strong>6. Antrenați corectorul ML, când aveți suficient istoric</strong><div class="text-mic">Minim ~1500 ore de producție reală cunoscută (implicit, configurabil în Modul tehnic).</div></div>
+  </div>
+  <div class="pas-ghid">
+    <div class="bifa"></div>
+    <div><strong>7. După o perioadă de probă, scoateți parcul din „mod umbră"</strong><div class="text-mic">Recomandat: minim 30 de zile (configurabil) — decizie manuală, niciodată automată.</div></div>
+  </div>
+</div>
+<p><a href="/">&larr; Înapoi la Portofoliu</a></p>
+{% endblock %}

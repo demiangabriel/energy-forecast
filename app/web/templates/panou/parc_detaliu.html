@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% block titlu %}{{ parc.nume }}{% endblock %}
+{% block continut %}
+
+{% if nou %}<div class="succes">Parc creat — pornit automat în <strong>mod umbră</strong> (calculează și salvează, dar nu trimite emailuri). Vedeți <a href="/ghid">ghidul de pornire</a> pentru pașii următori.</div>{% endif %}
+{% set actiune = request.query_params.get('actiune') %}
+{% if actiune == 'rulat' %}<div class="succes">Prognoza a fost recalculată.</div>{% endif %}
+{% if actiune == 'email' %}<div class="info">Trimiterea raportului a fost înregistrată — vedeți jurnalul din Modul tehnic pentru rezultat.</div>{% endif %}
+{% if request.query_params.get('eroare') %}<div class="eroare">{{ request.query_params.get('eroare') }}</div>{% endif %}
+{% if mesaj %}<div class="{{ 'succes' if actiune == 'import' else 'info' }}">{{ mesaj }}</div>{% endif %}
+{% if actiune == 'mod-umbra' %}<div class="succes">Starea „mod umbră" a fost actualizată.</div>{% endif %}
+{% if actiune == 'calibrare' %}<div class="succes">Geometria a fost actualizată cu rezultatul calibrării.</div>{% endif %}
+
+<div class="rand-titlu" style="display:flex;justify-content:space-between;align-items:flex-start">
+  <div>
+    <h1>{{ parc.nume }}</h1>
+    <p class="subtitlu">{{ parc.cod }} · {{ 'Fotovoltaic' if parc.tehnologie.value == 'fotovoltaic' else 'Eolian' }} ·
+      {{ putere_instalata | mw }} MW instalați ·
+      pas de {{ parc.rezolutie_minute }} min ·
+      <a href="/tehnic/parcuri/{{ parc.id }}">Modul tehnic pentru acest parc &rarr;</a></p>
+  </div>
+  <span class="pastila {{ rezumat.stare }}">
+    {% if rezumat.stare == 'livrat' %}Livrat{% elif rezumat.stare == 'abatere' %}Abatere
+    {% elif rezumat.stare == 'mod_umbra' %}Mod umbră{% elif rezumat.stare == 'doar_fizic' %}Doar fizic
+    {% else %}Fără date{% endif %}
+  </span>
+</div>
+
+{% if parc.mod_umbra %}
+<div class="avertisment">
+  Acest parc e în <strong>mod umbră</strong> de {{ zile_de_la_creare }} zile (recomandat: minim {{ zile_mod_umbra_recomandat }} zile de probă) —
+  calculează și salvează normal, dar NU trimite niciun email. Nimeni și nimic nu poate ocoli asta — nici măcar rularea manuală.
+  <form method="post" action="/parcuri/{{ parc.id }}/mod-umbra/dezactiveaza" style="margin-top:8px">
+    <button class="buton secundar" type="submit">Scoate din mod umbră</button>
+  </form>
+</div>
+{% else %}
+<form method="post" action="/parcuri/{{ parc.id }}/mod-umbra/activeaza" style="display:inline">
+  <button class="buton secundar" type="submit" style="font-size:12px;padding:4px 10px">Pune înapoi în mod umbră</button>
+</form>
+{% endif %}
+
+<div class="grup-actiuni">
+  <span class="eticheta-grup">Acțiuni</span>
+  <div class="actiuni">
+    <form method="post" action="/parcuri/{{ parc.id }}/ruleaza"><button class="buton" type="submit">Recalculează prognoza</button></form>
+    <form method="post" action="/parcuri/{{ parc.id }}/trimite-email">
+      <button class="buton secundar" type="submit" {{ 'disabled' if parc.mod_umbra or not parc.destinatari_email else '' }}>Trimite raport pe email</button>
+    </form>
+    <form class="grup-control" method="get" action="/parcuri/{{ parc.id }}/export.csv">
+      <button class="buton secundar" type="submit">Descarcă prognoza (CSV)</button>
+      <select name="format_timp" title="Cum se scrie coloana de timp în fișierul exportat"
+              aria-label="Format timestamp la export">
+        {% for cheie, info in formate_timp.items() %}
+        <option value="{{ cheie }}" {{ 'selected' if cheie == format_timp_implicit else '' }}>{{ info.exemplu }}</option>
+        {% endfor %}
+      </select>
+    </form>
+  </div>
+</div>
+
+<div class="grup-actiuni">
+  <span class="eticheta-grup">Analiză</span>
+  <div class="actiuni">
+    <a class="buton secundar" href="/parcuri/{{ parc.id }}/verificare">Verificare &amp; acuratețe</a>
+    <a class="buton secundar" href="/parcuri/{{ parc.id }}/comparatie">Reală vs. prognoză</a>
+    <a class="buton secundar" href="/parcuri/{{ parc.id }}/comparatie-meteo">Reală vs. prognoză (meteo)</a>
+    <a class="buton secundar" href="/parcuri/{{ parc.id }}/calitate">Calitatea datelor</a>
+    <a class="buton secundar" href="/parcuri/{{ parc.id }}/diagnostic-meteo">Diagnostic meteo</a>
+    <a class="buton secundar" href="/parcuri/{{ parc.id }}/prognoza-luna">Estimare lunară</a>
+    <a class="buton secundar" href="/parcuri/{{ parc.id }}/rapoarte">Rapoarte lunare</a>
+  </div>
+</div>
+
+<div class="grup-actiuni">
+  <span class="eticheta-grup">Date și model</span>
+  <div class="actiuni">
+    <a class="buton secundar" href="/parcuri/{{ parc.id }}/import">Import date istorice</a>
+    <form method="post" action="/parcuri/{{ parc.id }}/antreneaza"><button class="buton secundar" type="submit">Antrenează model ML</button></form>
+    <a class="buton secundar" href="/parcuri/{{ parc.id }}/antrenare">Analiza antrenării</a>
+    {% if parc.tehnologie.value == 'fotovoltaic' %}<a class="buton secundar" href="/parcuri/{{ parc.id }}/calibrare">Calibrează geometria</a>{% endif %}
+    <a class="buton secundar" href="/parcuri/{{ parc.id }}/reconstructie">Reconstruiește istoric</a>
+  </div>
+</div>
+{% if not parc.destinatari_email %}<p class="text-mic">Niciun destinatar email configurat — completați din Modul tehnic pentru acest parc.</p>{% endif %}
+{% if numar_ore_productie < prag_min_ore_antrenare %}<p class="text-mic">{{ numar_ore_productie }} ore de producție reală importate (prag pentru antrenare ML: {{ prag_min_ore_antrenare }}).</p>{% endif %}
+{% if rezumat_calitate.ore_marcate %}
+<p class="text-mic">Controlul de calitate a marcat {{ rezumat_calitate.ore_marcate }} din {{ rezumat_calitate.total_ore }} ore măsurate
+  ({{ rezumat_calitate.procent_curat }}% curate) — <a href="/parcuri/{{ parc.id }}/calitate">vezi ce s-a găsit</a>.</p>
+{% endif %}
+
+<h2>Prognoza curentă</h2>
+<div class="card">
+  <canvas id="graficPrognoza" height="90"></canvas>
+  {% if serie_grafic and serie_grafic[0].p10 is not none %}
+  <p class="text-mic" style="margin-bottom:0">Banda deschisă arată intervalul P10-P90: în ~80% din cazuri
+    producția reală ar trebui să cadă în interiorul ei. Cu cât banda e mai lată, cu atât ziua e mai incertă.</p>
+  {% endif %}
+</div>
+
+<h2>Acuratețe — ultimele {{ indicatori.numar_ore }} ore comparabile</h2>
+<div class="grid grid-4">
+  <div class="card kpi"><span class="val">{{ indicatori.nmae_pct | pct if indicatori.nmae_pct is not none else '—' }}</span><span class="eticheta">nMAE (din {{ indicatori.baza_normalizare_kw | mw }} MW)</span></div>
+  <div class="card kpi"><span class="val">{{ indicatori.bias_pct | pct if indicatori.bias_pct is not none else '—' }}</span><span class="eticheta">bias (abatere sistematică)</span></div>
+  <div class="card kpi"><span class="val">{{ '%+.3f'|format(indicatori.skill) if indicatori.skill is not none else '—' }}</span><span class="eticheta">skill vs. referință</span></div>
+  <div class="card kpi"><span class="val">{{ indicatori.energie_realizata_kwh | mw if indicatori.energie_realizata_kwh is not none else '—' }}</span><span class="eticheta">MWh realizat</span></div>
+</div>
+{% if indicatori.numar_ore %}
+<p class="text-mic">Calculat doar pe orele utile (fără nopți la fotovoltaic) și fără
+  {{ indicatori.ore_excluse_qc }} ore marcate de controlul de calitate.
+  <a href="/parcuri/{{ parc.id }}/verificare">Detalii complete și defalcare pe orizont &rarr;</a></p>
+{% endif %}
+
+{% if indicatori.serie %}
+<div class="card" style="margin-top:16px">
+  <canvas id="graficComparatie" height="90"></canvas>
+</div>
+{% endif %}
+
+<h2>Tabel recent</h2>
+<div class="card">
+  {% if tabel_recent %}
+  <p class="text-mic" style="margin-top:0">Ora e afișată LOCAL, în fusul parcului ({{ parc.fus_orar }}) — la fel ca
+    graficul de mai sus. Prognoza exclude ziua curentă (afișează doar zilele viitoare); dacă totuși
+    prima oră din tabel pare „azi”, verificați dacă rularea de mai jos e mai veche și a fost declanșată
+    ieri. Fiecare zi are un rând de total la final ({{ tabel_recent | length }} zile arătate).</p>
+  {% for zi in tabel_recent %}
+  <table style="margin-bottom:16px">
+    <tr><th colspan="7" style="text-align:left;background:var(--fond-zebra,#f4f6f5)">
+      {{ zi.zi.isoformat() }} — total estimat: <strong>{{ zi.energie_kwh | mw }} MWh</strong>
+    </th></tr>
+    <tr><th>Oră locală ({{ parc.fus_orar }})</th><th>Fizic (MW)</th><th>P10</th><th>Final (MW)</th><th>P90</th><th>Model</th><th>Avertismente</th></tr>
+    {% for o in zi.ore %}
+    <tr {{ 'class="rand-blocat"' if o.blocat else '' }}>
+      <td>{{ o.timestamp_utc | local(parc.fus_orar) }}</td>
+      <td>{{ o.putere_ac_fizic_kw | mw if o.putere_ac_fizic_kw is not none else '—' }}</td>
+      <td class="text-mic">{{ o.cuantile_kw['0.1'] | mw if o.cuantile_kw and '0.1' in o.cuantile_kw else '—' }}</td>
+      <td><strong>{{ o.putere_finala_kw | mw if o.putere_finala_kw is not none else 'BLOCAT' }}</strong></td>
+      <td class="text-mic">{{ o.cuantile_kw['0.9'] | mw if o.cuantile_kw and '0.9' in o.cuantile_kw else '—' }}</td>
+      <td>{{ o.model_folosit or 'fizică pură' }}</td>
+      <td class="text-mic">{{ o.avertismente | join('; ') }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endfor %}
+  {% else %}
+  <p>Nu există încă nicio rulare pentru acest parc.</p>
+  {% endif %}
+</div>
+
+{% if modele_ml %}
+<h2>Modele de corecție antrenate</h2>
+<div class="card">
+  <table>
+    <tr><th>Antrenat la</th><th>Stare</th><th>MAE validare (MW)</th><th>Skill</th><th>Ore antrenare</th><th>Note</th></tr>
+    {% for m in modele_ml %}
+    <tr>
+      <td>{{ m.antrenat_la[:16].replace('T',' ') }}</td>
+      <td><span class="pastila {{ 'livrat' if m.activ else 'mod_umbra' }}">{{ 'ACTIV' if m.activ else 'inactiv' }}</span></td>
+      <td>{{ m.mae_validare_kw | mw }}</td>
+      <td>{{ '%+.3f'|format(m.skill_vs_referinta) if m.skill_vs_referinta is not none else '—' }}</td>
+      <td>{{ m.numar_ore_antrenare }}</td>
+      <td class="text-mic">{{ m.note or '' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p class="text-mic">Un model nou devine activ doar dacă bate modelul curent pe date nevăzute la
+    antrenare (R-605). Dacă iese mai slab, rămâne salvat, dar inactiv — versiunea veche continuă să
+    lucreze, fără intervenție manuală.</p>
+</div>
+{% endif %}
+
+<h2>Rulări recente</h2>
+<div class="card">
+  <table>
+    <tr><th>Declanșată la</th><th>Tip</th><th>Stare</th><th>Mesaj</th><th></th></tr>
+    {% for r in rulari_recente %}
+    <tr><td>{{ r.declansata_la[:19].replace('T',' ') }} UTC</td><td>{{ r.tip }}</td>
+      <td><span class="pastila {{ 'livrat' if r.stare == 'reusita' else ('abatere' if r.stare == 'partiala' else 'fara_date') }}">{{ r.stare }}</span></td>
+      <td class="text-mic">{{ r.mesaj or '' }}</td>
+      <td><a href="/tehnic/parcuri/{{ parc.id }}/trasabilitate/{{ r.id }}">trasabilitate</a></td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+{% endblock %}
+{% block script %}
+<script>
+// datele vin din backend în kW (unitatea internă) — conversia la MW pentru
+// afișare se face aici, o singură dată, ca restul aplicației să rămână în kW.
+const kwLaMw = v => v === null || v === undefined ? v : v / 1000;
+const etichetePrognoza = {{ (serie_grafic | map(attribute='timestamp') | list) | tojson }};
+const fizicData = {{ (serie_grafic | map(attribute='fizic') | list) | tojson }}.map(kwLaMw);
+const finalData = {{ (serie_grafic | map(attribute='final') | list) | tojson }}.map(kwLaMw);
+const p10Data = {{ (serie_grafic | map(attribute='p10') | list) | tojson }}.map(kwLaMw);
+const p90Data = {{ (serie_grafic | map(attribute='p90') | list) | tojson }}.map(kwLaMw);
+const areBenzi = p10Data.some(v => v !== null);
+
+if (document.getElementById('graficPrognoza')) {
+  const seturi = [];
+  if (areBenzi) {
+    // banda de incertitudine, desenată sub curbele principale
+    seturi.push({ label: 'P10', data: p10Data, borderColor: 'rgba(31,111,80,.25)', pointRadius: 0,
+                  borderWidth: 1, fill: false, tension: .25 });
+    seturi.push({ label: 'P90', data: p90Data, borderColor: 'rgba(31,111,80,.25)', pointRadius: 0,
+                  borderWidth: 1, backgroundColor: 'rgba(31,111,80,.12)', fill: '-1', tension: .25 });
+  }
+  seturi.push({ label: 'Fizic (MW)', data: fizicData, borderColor: '#5f6b6d', borderDash: [4,3], pointRadius: 0, tension: .25 });
+  seturi.push({ label: 'Final (MW)', data: finalData, borderColor: '#1f6f50', borderWidth: 2, pointRadius: 0, tension: .25 });
+
+  new Chart(document.getElementById('graficPrognoza'), {
+    type: 'line',
+    data: { labels: etichetePrognoza, datasets: seturi },
+    options: { responsive: true, interaction: {mode: 'index', intersect: false},
+      scales: { y: { title: { display: true, text: 'MW' } } } }
+  });
+}
+
+const serieComparatie = {{ indicatori.serie | tojson }};
+if (document.getElementById('graficComparatie') && serieComparatie.length) {
+  new Chart(document.getElementById('graficComparatie'), {
+    type: 'line',
+    data: {
+      labels: serieComparatie.map(r => r.timestamp.slice(5,16).replace('T',' ')),
+      datasets: [
+        { label: 'Prognozat (MW)', data: serieComparatie.map(r => kwLaMw(r.prognozat)), borderColor: '#1a5fb4', pointRadius: 0, tension: .2 },
+        { label: 'Realizat (MWh)', data: serieComparatie.map(r => kwLaMw(r.realizat)), borderColor: '#1f6f50', pointRadius: 0, tension: .2 },
+      ]
+    },
+    options: { responsive: true, interaction: {mode: 'index', intersect: false} }
+  });
+}
+</script>
+{% endblock %}

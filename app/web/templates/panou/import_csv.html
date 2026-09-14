@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block titlu %}Import istoric — {{ parc.nume }}{% endblock %}
+{% block continut %}
+<h1>Import producție istorică</h1>
+<p class="subtitlu">{{ parc.nume }} ({{ parc.cod }}) — format obligatoriu: antet exact <code>timestamp;kWh</code>,
+  separator „;”, pas orar, iar ora scrisă ISO 8601 <strong>cu decalaj de fus orar</strong>.</p>
+
+<div class="card" style="border-left:4px solid #1f6f50">
+  <h3 style="margin-top:0">Formatul de bază — ora cu decalaj explicit</h3>
+<pre style="background:#f4f6f5;padding:10px;border-radius:4px;overflow-x:auto;margin:0 0 10px 0"><code>timestamp;kWh
+2025-03-30T01:00:00+02:00;1234.5
+2025-03-30T03:00:00+03:00;1301.0
+2025-03-30T04:00:00+03:00;1450.2</code></pre>
+  <p class="text-mic" style="margin-bottom:6px"><strong>De ce decalajul e obligatoriu.</strong>
+    O oră scrisă fără el — „2025-10-26 03:00” — nu identifică un moment în timp în România.
+    În noaptea trecerii la ora de iarnă, ora locală 03:00 se petrece de <strong>două ori</strong>
+    (o dată la +03:00, o dată la +02:00), iar la trecerea la ora de vară ora locală 03:00
+    <strong>nu există deloc</strong>. Aceleași cifre pot însemna două momente diferite sau niciunul,
+    iar diferența e exact o oră de producție atribuită greșit.</p>
+  <p class="text-mic" style="margin-bottom:6px">Cu decalajul în fișier dispar cele trei simptome clasice
+    ale unui import ambiguu: „timestamp duplicat” la trecerea la ora de iarnă, „interval neregulat” la
+    trecerea la ora de vară și vârful de producție decalat cu o oră față de amiaza solară. Nu mai contează
+    nici ce fus de import e declarat pe parc — fișierul îl poartă cu el, linie cu linie.</p>
+  <p class="text-mic" style="margin-bottom:0">Se acceptă și <code>2025-03-30 01:00:00+02:00</code> (spațiu în loc de „T”)
+    și <code>2025-03-30T01:00:00Z</code> (UTC). România: <code>+02:00</code> iarna, <code>+03:00</code> vara.</p>
+</div>
+
+<div class="card" style="border-left:4px solid #c9a227;margin-top:16px">
+  <h3 style="margin-top:0">A doua regulă: eticheta e ÎNCEPUTUL intervalului</h3>
+  <p class="text-mic" style="margin-bottom:6px">Decalajul rezolvă „care oră locală”, dar nu și asta:
+    <code>2025-06-01T12:00:00+03:00</code> e un moment fără dubiu, însă rămâne de știut dacă energia
+    raportată acolo s-a produs înainte sau după el.</p>
+  <p class="text-mic" style="margin-bottom:6px">Platforma folosește <strong>o singură convenție, peste
+    tot</strong>: eticheta denumește începutul intervalului, deci <code>12:00</code> înseamnă
+    <strong>energia produsă între 12:00 și 13:00</strong>. E convenția piețelor de energie
+    (PZU/OPCOM, ENTSO-E) și a contoarelor, aceeași la import, la prognoză, în rapoarte și la export.
+    Nu există nimic de configurat și nimic de ghicit.</p>
+  <p class="text-mic" style="margin-bottom:0">Dacă exportul dvs. folosește finalul intervalului,
+    trebuie mutat cu un pas înapoi înainte de încărcare — altfel toată producția intră decalată cu o
+    oră, iar comparația cu prognoza va arăta o eroare care nu există.</p>
+</div>
+
+<div class="avertisment" style="margin-top:16px">
+  <strong>Fusul de import ({{ fus_import_efectiv }})</strong> se folosește DOAR pentru fișierele în formatul
+  vechi, fără decalaj. Dacă fișierul are decalaj pe fiecare linie — cum ar trebui — această setare nu îl
+  mai poate strica.
+  {% if parc.fus_orar_import and parc.fus_orar_import != parc.fus_orar %}
+  <br>Acesta e un fus de <strong>import</strong> declarat separat — prognozele acestui parc rămân afișate
+  în fusul {{ parc.fus_orar }} (nu se schimbă aici).
+  {% endif %}
+  <form method="post" action="/parcuri/{{ parc.id }}/import/fus-orar" style="margin-top:8px;display:flex;gap:8px;align-items:center">
+    <select name="fus_orar">
+      {% for valoare, eticheta in fusuri %}
+      <option value="{{ valoare }}" {{ 'selected' if fus_import_efectiv == valoare else '' }}>{{ eticheta }}</option>
+      {% endfor %}
+    </select>
+    <button class="buton secundar" type="submit" style="font-size:12px;padding:4px 10px">Actualizează fusul de import</button>
+  </form>
+</div>
+
+{% if not raport %}
+<div class="card" style="max-width:640px">
+  <form class="form-simplu" method="post" action="/parcuri/{{ parc.id }}/import/analizeaza" enctype="multipart/form-data">
+    <div class="camp">
+      <label>Fișier CSV</label>
+      <input type="file" name="fisier" accept=".csv" required>
+    </div>
+    <div class="camp">
+      <label style="font-weight:normal;display:flex;gap:8px;align-items:flex-start">
+        <input type="checkbox" name="permite_ora_locala" value="1" style="margin-top:3px">
+        <span>Fișierul meu <strong>nu poate</strong> conține decalajul — interpretează orele ca oră locală
+          în fusul {{ fus_import_efectiv }} (format vechi)</span>
+      </label>
+      <div class="explicatie">Bifați doar dacă exportul din SCADA/contor chiar nu poate scrie decalajul.
+        Orele imposibile sau ambigue din nopțile schimbării orei vor fi semnalate una câte una și vor
+        bloca importul până la corectare — pentru că platforma nu are cum să ghicească corect care oră
+        e care.</div>
+    </div>
+    <button class="buton" type="submit">Pasul 1 — Analizează</button>
+  </form>
+  <p class="text-mic" style="margin-top:12px">Pasul 1 doar citește și validează fișierul — nu scrie nimic în bază de date. Scrierea efectivă (Pasul 2) se face doar după ce confirmați raportul.</p>
+</div>
+{% else %}
+<div class="card">
+  <h3>Raport de analiză (Pasul 1)</h3>
+  <p>{{ raport.numar_randuri_citite }} rânduri citite, {{ raport.randuri_valide | length }} valide.</p>
+
+  {% if raport.erori %}
+  <div class="eroare"><strong>{{ raport.erori | length }} eroare/erori — importul e blocat:</strong>
+    <ul style="margin:6px 0 0 18px;padding:0">{% for e in raport.erori[:30] %}<li>{{ e }}</li>{% endfor %}</ul>
+    {% if raport.erori | length > 30 %}<p class="text-mic">... și încă {{ raport.erori | length - 30 }}.</p>{% endif %}
+  </div>
+  {% endif %}
+
+  {% if raport.avertismente %}
+  <div class="avertisment"><strong>Avertismente (nu blochează importul):</strong>
+    <ul style="margin:6px 0 0 18px;padding:0">{% for a in raport.avertismente[:15] %}<li>{{ a }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+
+  {% if raport.valid %}
+  <form method="post" action="/parcuri/{{ parc.id }}/import/confirma">
+    <input type="hidden" name="token" value="{{ token }}">
+    <button class="buton" type="submit">Pasul 2 — Confirmă și importă {{ raport.randuri_valide | length }} rânduri</button>
+  </form>
+  {% else %}
+  <p><a href="/parcuri/{{ parc.id }}/import">&larr; Corectați fișierul și încercați din nou</a></p>
+  {% endif %}
+</div>
+{% endif %}
+
+<p><a href="/parcuri/{{ parc.id }}">&larr; Înapoi la parc</a></p>
+{% endblock %}
