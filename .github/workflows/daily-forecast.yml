@@ -17,8 +17,8 @@ name: Rulare zilnică prognoză
 
 on:
   schedule:
-    - cron: '0 5 * * *'   # acoperă cazul cu ora de vară a României (UTC+3 -> 08:00 local)
-    - cron: '0 6 * * *'   # acoperă cazul cu ora de iarnă a României (UTC+2 -> 08:00 local)
+    - cron: '4 6 * * *'   # acoperă cazul cu ora de vară a României (UTC+3 -> 08:00 local)
+    - cron: '4 7 * * *'   # acoperă cazul cu ora de iarnă a României (UTC+2 -> 08:00 local)
   workflow_dispatch: {}   # R-904 — declanșator manual suplimentar, la cerere
 
 jobs:
